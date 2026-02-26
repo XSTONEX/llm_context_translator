@@ -12,7 +12,7 @@
   const PANEL_MIN_WIDTH = 280;
   const PANEL_MIN_HEIGHT = 200;
   const PANEL_GAP = 10;
-  const DEBOUNCE_DELAY = 200;
+  const DEBOUNCE_DELAY = 300;
   const WORD_THRESHOLD = 3;
 
   const state = {
@@ -23,7 +23,14 @@
     isVisible: false,
     dragOffset: { x: 0, y: 0 },
     currentText: '',
-    currentResponseData: null
+    currentResponseData: null,
+    // TTS 状态
+    ttsAbortController: null,
+    ttsBlobUrl: null,
+    ttsReady: false,
+    ttsLoading: false,
+    ttsError: false,
+    ttsAudio: null
   };
 
   // SVG 图标
@@ -115,6 +122,9 @@
     if (selectedText === state.currentText && state.isVisible) return;
 
     state.currentText = selectedText;
+
+    // 并发预加载 TTS（不阻塞翻译）
+    fetchTTS(selectedText);
 
     // 获取选区坐标
     const range = selection.getRangeAt(0);
@@ -235,6 +245,121 @@
       return fullText.trim().slice(0, 500);
     } catch {
       return '';
+    }
+  }
+
+  // ========== TTS 预加载与播放 ==========
+
+  const DEFAULT_API_BASE = 'http://localhost:8000';
+
+  function getApiBase() {
+    return new Promise((resolve) => {
+      chrome.storage.local.get(['apiBase'], (result) => {
+        resolve(result.apiBase || DEFAULT_API_BASE);
+      });
+    });
+  }
+
+  function cleanupTTS() {
+    if (state.ttsAbortController) {
+      state.ttsAbortController.abort();
+      state.ttsAbortController = null;
+    }
+    if (state.ttsAudio) {
+      state.ttsAudio.pause();
+      state.ttsAudio = null;
+    }
+    if (state.ttsBlobUrl) {
+      URL.revokeObjectURL(state.ttsBlobUrl);
+      state.ttsBlobUrl = null;
+    }
+    state.ttsReady = false;
+    state.ttsLoading = false;
+    state.ttsError = false;
+  }
+
+  async function fetchTTS(text) {
+    cleanupTTS();
+
+    const apiBase = await getApiBase();
+    const controller = new AbortController();
+    state.ttsAbortController = controller;
+    state.ttsLoading = true;
+    updateSpeakerButtonState();
+
+    try {
+      const response = await fetch(`${apiBase}/api/tts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, voice: 'alloy' }),
+        signal: controller.signal
+      });
+
+      if (!response.ok) throw new Error(`TTS API error: ${response.status}`);
+
+      const blob = await response.blob();
+      if (controller.signal.aborted) return;
+
+      state.ttsBlobUrl = URL.createObjectURL(blob);
+      state.ttsReady = true;
+      state.ttsLoading = false;
+      updateSpeakerButtonState();
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+      console.error('[LCT] TTS fetch failed:', err);
+      state.ttsLoading = false;
+      state.ttsError = true;
+      updateSpeakerButtonState();
+    }
+  }
+
+  function updateSpeakerButtonState() {
+    if (!panelElement) return;
+    const btn = panelElement.querySelector('[data-action="speaker"]');
+    if (!btn) return;
+
+    btn.classList.toggle('lct-speaker-loading', state.ttsLoading);
+    btn.classList.toggle('lct-speaker-ready', state.ttsReady);
+    btn.classList.toggle('lct-speaker-error', state.ttsError);
+
+    if (state.ttsLoading) {
+      btn.title = '加载中...';
+    } else if (state.ttsReady) {
+      btn.title = '点击发音';
+    } else if (state.ttsError) {
+      btn.title = '发音加载失败';
+    } else {
+      btn.title = '发音';
+    }
+  }
+
+  function playTTS() {
+    if (!state.ttsBlobUrl || !state.ttsReady) return;
+    // 上一次音频尚未播完，忽略本次点击
+    if (state.ttsAudio && !state.ttsAudio.paused && !state.ttsAudio.ended) return;
+
+    const audio = new Audio(state.ttsBlobUrl);
+    state.ttsAudio = audio;
+    audio.addEventListener('ended', () => { state.ttsAudio = null; });
+    audio.play().catch((err) => {
+      console.error('[LCT] Audio playback failed:', err);
+      state.ttsAudio = null;
+    });
+  }
+
+  function handleSpeakerClick() {
+    if (state.ttsReady) {
+      playTTS();
+    } else if (state.ttsLoading) {
+      const checkInterval = setInterval(() => {
+        if (state.ttsReady) {
+          clearInterval(checkInterval);
+          playTTS();
+        } else if (!state.ttsLoading) {
+          clearInterval(checkInterval);
+        }
+      }, 100);
+      setTimeout(() => clearInterval(checkInterval), 15000);
     }
   }
 
@@ -486,8 +611,9 @@
 
       const speakerBtn = createIconButton('speaker', ICONS.speaker);
       speakerBtn.classList.add('lct-speaker');
-      speakerBtn.title = '发音（暂未实现）';
+      speakerBtn.title = '发音';
       header.appendChild(speakerBtn);
+      updateSpeakerButtonState();
     } else {
       header.classList.add('lct-sentence-section');
 
@@ -495,6 +621,12 @@
       original.classList.add('lct-original');
       original.textContent = receivedData.query;
       header.appendChild(original);
+
+      const speakerBtn = createIconButton('speaker', ICONS.speaker);
+      speakerBtn.classList.add('lct-speaker');
+      speakerBtn.title = '发音';
+      header.appendChild(speakerBtn);
+      updateSpeakerButtonState();
     }
 
     header.classList.add('lct-fade-in');
@@ -740,11 +872,7 @@
   function addCoreTranslationButtons(coreTranslationText) {
     if (!panelElement || !coreTranslationText) return;
     const core = panelElement.querySelector('.lct-core-translation');
-    if (!core || core.querySelector('[data-action="speaker"]')) return;
-
-    const speakerBtn = createIconButton('speaker', ICONS.speaker);
-    speakerBtn.title = '发音（暂未实现）';
-    core.appendChild(speakerBtn);
+    if (!core || core.querySelector('[data-action="copy-context"]')) return;
 
     const copyBtn = createIconButton('copy-context', ICONS.copy);
     copyBtn.title = '复制核心翻译';
@@ -877,7 +1005,7 @@
 
     const speakerBtn = createIconButton('speaker', ICONS.speaker);
     speakerBtn.classList.add('lct-speaker');
-    speakerBtn.title = '发音（暂未实现）';
+    speakerBtn.title = '发音';
     header.appendChild(speakerBtn);
 
     return header;
@@ -946,6 +1074,11 @@
     original.textContent = data.query;
     section.appendChild(original);
 
+    const speakerBtn = createIconButton('speaker', ICONS.speaker);
+    speakerBtn.classList.add('lct-speaker');
+    speakerBtn.title = '发音';
+    section.appendChild(speakerBtn);
+
     const translation = document.createElement('div');
     translation.classList.add('lct-translation');
     translation.textContent = data.translation;
@@ -979,11 +1112,6 @@
       const coreText = document.createElement('span');
       coreText.textContent = data.contextAnalysis.coreTranslation;
       core.appendChild(coreText);
-
-      // 发音图标占位
-      const speakerBtn = createIconButton('speaker', ICONS.speaker);
-      speakerBtn.title = '发音（暂未实现）';
-      core.appendChild(speakerBtn);
 
       // 复制图标
       const copyBtn = createIconButton('copy-context', ICONS.copy);
@@ -1069,6 +1197,7 @@
       state.isVisible = false;
       state.isPinned = false;
       state.currentText = '';
+      cleanupTTS();
 
       // 重置钉子按钮状态
       if (panelElement) {
@@ -1095,6 +1224,8 @@
         togglePin();
       } else if (action === 'copy') {
         handleCopy(btn);
+      } else if (action === 'speaker') {
+        handleSpeakerClick();
       }
     });
 

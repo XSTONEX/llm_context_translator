@@ -9,6 +9,10 @@
     "storage"
   ],
 
+  "host_permissions": [
+    "http://localhost/*"
+  ],
+
   "action": {
     "default_popup": "popup.html",
     "default_icon": {

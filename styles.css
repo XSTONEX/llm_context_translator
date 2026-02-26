@@ -199,6 +199,30 @@
   margin-left: 2px;
   position: relative;
   top: 2px;
+  cursor: pointer;
+}
+
+.lct-speaker-loading {
+  animation: lct-speaker-pulse 1s ease-in-out infinite;
+}
+
+@keyframes lct-speaker-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.lct-speaker-ready {
+  color: var(--lct-accent);
+}
+
+.lct-speaker-error {
+  color: var(--lct-text-tertiary);
+  opacity: 0.5;
+}
+
+.lct-sentence-section .lct-speaker {
+  display: inline-flex;
+  margin-top: 4px;
 }
 
 /* ========== 释义与例句 ========== */

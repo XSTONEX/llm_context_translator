@@ -6,10 +6,10 @@ from typing import AsyncGenerator, List, Optional
 import aiohttp
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
-from config import SILICONFLOW_API_KEY, LLM_API_BASE_URL
+from config import DEERAPI_BASE_URL, DEERAPI_KEY, SILICONFLOW_API_KEY, LLM_API_BASE_URL
 from json_stream_parser import JsonStreamParser
 from models import DEFAULT_MODEL, get_models_response, model_supports_thinking, resolve_model
 from prompts import (
@@ -20,6 +20,11 @@ from prompts import (
 )
 
 # ========== Pydantic 数据模型 ==========
+
+
+class TTSRequest(BaseModel):
+    text: str
+    voice: str = "alloy"
 
 
 class TranslateRequest(BaseModel):
@@ -274,6 +279,44 @@ async def translate(req: TranslateRequest):
 
     data = ensure_response_fields(data, req.selected_text, word_mode)
     return data
+
+
+# ========== TTS 端点 ==========
+
+
+@app.post("/api/tts")
+async def text_to_speech(req: TTSRequest):
+    """调用 DeerAPI 生成语音，返回 audio/mpeg 二进制流"""
+    if not DEERAPI_KEY:
+        raise HTTPException(status_code=500, detail="DEERAPI_KEY 未配置")
+
+    url = f"{DEERAPI_BASE_URL}/audio/speech"
+    headers = {
+        "Authorization": f"Bearer {DEERAPI_KEY}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": "gpt-4o-mini-tts-2025-03-20",
+        "input": req.text,
+        "voice": req.voice,
+    }
+
+    try:
+        async with app.state.session.post(url, json=payload, headers=headers) as resp:
+            if resp.status != 200:
+                error_text = await resp.text()
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"TTS API 返回 {resp.status}: {error_text[:200]}",
+                )
+            audio_data = await resp.read()
+            return Response(
+                content=audio_data,
+                media_type="audio/mpeg",
+                headers={"Content-Disposition": "inline"},
+            )
+    except aiohttp.ClientError as e:
+        raise HTTPException(status_code=502, detail=f"TTS 服务请求失败: {str(e)}")
 
 
 # ========== 模型列表端点 ==========
