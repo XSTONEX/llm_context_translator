@@ -345,6 +345,126 @@
   border-top: 1px solid var(--lct-border);
 }
 
+/* ========== 句法分析卡片 ========== */
+.lct-progressive-syntax {
+  margin: var(--lct-gap-lg) var(--lct-padding);
+  padding: var(--lct-padding-sm);
+  background: var(--lct-bg-secondary);
+  border-radius: var(--lct-radius-sm);
+}
+
+.lct-syntax-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--lct-gap);
+  margin-bottom: 8px;
+}
+
+.lct-syntax-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--lct-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ---- 行内流式容器 ---- */
+.lct-syntax-inline-flow {
+  display: block;
+  line-height: 2.2;
+  margin-bottom: 10px;
+  font-size: var(--lct-font-size-sm);
+  color: var(--lct-text-primary);
+}
+
+/* ---- 语法节点 ---- */
+.lct-syntax-node {
+  display: inline;
+  position: relative;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: border-color 0.2s;
+}
+
+.lct-syntax-node--omitted {
+  opacity: 0.6;
+  font-style: italic;
+  margin: 0 4px;
+}
+
+/* ---- 常驻下划线（5 种类型色） ---- */
+.lct-syntax-node[data-type="subject"] {
+  border-bottom-color: #ff4d4f;
+}
+.lct-syntax-node[data-type="predicate"] {
+  border-bottom-color: #1890ff;
+}
+.lct-syntax-node[data-type="object"] {
+  border-bottom-color: #52c41a;
+}
+.lct-syntax-node[data-type="modifier"] {
+  border-bottom-color: #faad14;
+}
+.lct-syntax-node[data-type="clause"] {
+  border-bottom-color: #722ed1;
+}
+
+/* ---- 纯 CSS Tooltip 气泡 ---- */
+.lct-syntax-node::before {
+  content: attr(data-role);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 8px;
+  background: #fff;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+  z-index: 10;
+}
+
+/* Tooltip 三角箭头 */
+.lct-syntax-node::after {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: #fff;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+  z-index: 10;
+}
+
+.lct-syntax-node:hover::before,
+.lct-syntax-node:hover::after {
+  opacity: 1;
+}
+
+/* ---- Tooltip 文字颜色匹配类型 ---- */
+.lct-syntax-node[data-type="subject"]::before { color: #ff4d4f; }
+.lct-syntax-node[data-type="predicate"]::before { color: #1890ff; }
+.lct-syntax-node[data-type="object"]::before { color: #52c41a; }
+.lct-syntax-node[data-type="modifier"]::before { color: #faad14; }
+.lct-syntax-node[data-type="clause"]::before { color: #722ed1; }
+
+/* ---- 结构解析文本 ---- */
+.lct-syntax-explanation {
+  font-size: var(--lct-font-size-sm);
+  color: var(--lct-text-secondary);
+  line-height: 1.7;
+  padding-top: 8px;
+  border-top: 1px solid var(--lct-border);
+}
+
 /* ========== 分隔线 ========== */
 .lct-divider {
   height: 1px;

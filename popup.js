@@ -5,7 +5,6 @@
 
 'use strict';
 
-const DEFAULT_API_BASE = 'http://localhost:8000';
 const STATUS_CHECK_TIMEOUT = 3000;
 
 document.addEventListener('DOMContentLoaded', init);

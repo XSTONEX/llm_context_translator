@@ -50,6 +50,23 @@ class ContextAnalysis(BaseModel):
     usage: str = ""
 
 
+class SyntaxComponent(BaseModel):
+    text: str
+    role: str
+    type: str
+    isOmitted: bool = False
+
+
+class SyntaxAnalysis(BaseModel):
+    inlineComponents: List[SyntaxComponent] = []
+    structureExplanation: str = ""
+
+
+class KeyExpressionItem(BaseModel):
+    phrase: str
+    meaning: str
+
+
 class TranslateResponse(BaseModel):
     query: str
     isWord: bool
@@ -57,6 +74,8 @@ class TranslateResponse(BaseModel):
     translation: Optional[str] = None
     definitions: Optional[List[DefinitionItem]] = None
     contextAnalysis: Optional[ContextAnalysis] = None
+    syntaxAnalysis: Optional[SyntaxAnalysis] = None
+    keyExpressions: Optional[List[KeyExpressionItem]] = None
 
 
 # ========== aiohttp 会话生命周期 ==========
@@ -112,10 +131,12 @@ def ensure_response_fields(data: dict, selected_text: str, word_mode: bool) -> d
         data.setdefault("phonetic", "")
         data.setdefault("definitions", [])
     else:
-        data.setdefault("phonetic", None)
         data.setdefault("translation", "")
-        data.setdefault("definitions", None)
         data.setdefault("keyExpressions", [])
+        data.setdefault("syntaxAnalysis", {
+            "inlineComponents": [],
+            "structureExplanation": "",
+        })
 
     data.setdefault("contextAnalysis", {
         "coreTranslation": "",

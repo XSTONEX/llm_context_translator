@@ -9,9 +9,10 @@ from typing import Any, Optional
 # LLM 输出 JSON 的已知字段顺序
 SIMPLE_FIELDS = ("query", "isWord", "phonetic")
 STREAMING_FIELDS = ("translation",)
-COMPLEX_FIELDS = ("definitions", "contextAnalysis", "keyExpressions")
+COMPLEX_FIELDS = ("definitions", "syntaxAnalysis", "contextAnalysis", "keyExpressions")
 ALL_FIELDS = SIMPLE_FIELDS + STREAMING_FIELDS + COMPLEX_FIELDS
 CONTEXT_STREAMING_SUBFIELDS = ("coreTranslation", "analysis", "usage")
+SYNTAX_STREAMING_SUBFIELDS = ("structureExplanation",)
 
 
 class JsonStreamParser:
@@ -23,6 +24,9 @@ class JsonStreamParser:
         self.last_translation_len: int = 0
         self.last_context_lens: dict[str, int] = {
             name: 0 for name in CONTEXT_STREAMING_SUBFIELDS
+        }
+        self.last_syntax_lens: dict[str, int] = {
+            name: 0 for name in SYNTAX_STREAMING_SUBFIELDS
         }
         self.is_done: bool = False
 
@@ -74,12 +78,24 @@ class JsonStreamParser:
         # 5. contextAnalysis 子字段：增量文本流（打字机效果）
         if "contextAnalysis" not in self.emitted_fields:
             for subfield in CONTEXT_STREAMING_SUBFIELDS:
-                partial = self._extract_context_subfield_partial(subfield)
+                partial = self._extract_nested_subfield_partial("contextAnalysis", subfield)
                 if partial is not None and len(partial) > self.last_context_lens[subfield]:
                     self.last_context_lens[subfield] = len(partial)
                     events.append({
                         "type": "text",
                         "name": f"contextAnalysis.{subfield}",
+                        "value": partial,
+                    })
+
+        # 6. syntaxAnalysis 子字段：增量文本流（打字机效果）
+        if "syntaxAnalysis" not in self.emitted_fields:
+            for subfield in SYNTAX_STREAMING_SUBFIELDS:
+                partial = self._extract_nested_subfield_partial("syntaxAnalysis", subfield)
+                if partial is not None and len(partial) > self.last_syntax_lens[subfield]:
+                    self.last_syntax_lens[subfield] = len(partial)
+                    events.append({
+                        "type": "text",
+                        "name": f"syntaxAnalysis.{subfield}",
                         "value": partial,
                     })
 
@@ -210,9 +226,9 @@ class JsonStreamParser:
             raw = raw[:-1]
         return self._decode_json_string(raw)
 
-    def _find_context_analysis_start(self) -> Optional[int]:
-        """找到 contextAnalysis 对象的 { 位置"""
-        value_start = self._find_key_colon("contextAnalysis")
+    def _find_object_start(self, field_name: str) -> Optional[int]:
+        """找到指定字段对象的 { 位置"""
+        value_start = self._find_key_colon(field_name)
         if value_start is None:
             return None
         pos = value_start
@@ -222,15 +238,15 @@ class JsonStreamParser:
             return None
         return pos
 
-    def _extract_context_subfield_partial(self, subfield: str) -> Optional[str]:
-        """提取 contextAnalysis 子字段的部分内容（用于打字机效果）"""
-        ctx_start = self._find_context_analysis_start()
-        if ctx_start is None:
+    def _extract_nested_subfield_partial(self, parent_field: str, subfield: str) -> Optional[str]:
+        """提取嵌套对象子字段的部分内容（用于打字机效果）"""
+        obj_start = self._find_object_start(parent_field)
+        if obj_start is None:
             return None
 
-        # 在 contextAnalysis 对象内搜索子字段 key
+        # 在父对象内搜索子字段 key
         pattern = f'"{subfield}"'
-        key_pos = self.buffer.find(pattern, ctx_start)
+        key_pos = self.buffer.find(pattern, obj_start)
         if key_pos == -1:
             return None
 

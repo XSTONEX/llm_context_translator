@@ -5,7 +5,7 @@
 
 'use strict';
 
-const DEFAULT_API_BASE = 'http://localhost:8000';
+importScripts('config.js');
 
 async function getApiBase() {
   return new Promise((resolve) => {

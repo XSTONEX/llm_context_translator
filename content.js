@@ -153,6 +153,7 @@
         phonetic: null,
         translation: null,
         definitions: null,
+        syntaxAnalysis: null,
         contextAnalysis: null,
         keyExpressions: null
       };
@@ -177,6 +178,9 @@
                 receivedData.translation = msg.value;
                 updateTranslationText(msg.value, receivedData);
               }
+            } else if (msg.name.startsWith('syntaxAnalysis.')) {
+              const subfield = msg.name.split('.')[1];
+              updateSyntaxSubfield(subfield, msg.value);
             } else if (msg.name.startsWith('contextAnalysis.')) {
               const subfield = msg.name.split('.')[1];
               updateContextSubfield(subfield, msg.value);
@@ -249,8 +253,6 @@
   }
 
   // ========== TTS 预加载与播放 ==========
-
-  const DEFAULT_API_BASE = 'http://localhost:8000';
 
   function getApiBase() {
     return new Promise((resolve) => {
@@ -459,6 +461,12 @@
     ctxSection.appendChild(createSkeletonLines('lct-skeleton-short', 'lct-skeleton-long', 'lct-skeleton-medium'));
     panelElement.appendChild(ctxSection);
 
+    // SyntaxAnalysis 骨架（语境解析之后、高级表达之前）
+    const syntaxSection = document.createElement('div');
+    syntaxSection.classList.add('lct-progressive-syntax');
+    syntaxSection.appendChild(createSkeletonLines('lct-skeleton-short', 'lct-skeleton-long', 'lct-skeleton-medium'));
+    panelElement.appendChild(syntaxSection);
+
     // KeyExpressions 骨架（长句模式才显示，初始隐藏）
     const exprSection = document.createElement('div');
     exprSection.classList.add('lct-progressive-expressions');
@@ -559,6 +567,21 @@
         break;
       }
 
+      case 'syntaxAnalysis': {
+        // 如果已经由流式子字段事件渲染了 syntax card，跳过
+        const section = panelElement.querySelector('.lct-progressive-syntax');
+        if (section && value && !section.querySelector('.lct-syntax-label')) {
+          section.style.display = 'block';
+          section.innerHTML = '';
+          const syntaxEl = buildSyntaxAnalysis(value, receivedData.query);
+          while (syntaxEl.firstChild) {
+            section.appendChild(syntaxEl.firstChild);
+          }
+          section.classList.add('lct-fade-in');
+        }
+        break;
+      }
+
       case 'keyExpressions': {
         const section = panelElement.querySelector('.lct-progressive-expressions');
         if (section && value && value.length > 0) {
@@ -591,9 +614,11 @@
     }
 
     if (receivedData.isWord) {
-      // 单词模式：隐藏 translation 骨架（释义由 definitions 提供）
+      // 单词模式：隐藏 translation 和 syntax 骨架
       const transSection = panelElement.querySelector('.lct-progressive-translation');
       if (transSection) transSection.style.display = 'none';
+      const syntaxSection = panelElement.querySelector('.lct-progressive-syntax');
+      if (syntaxSection) syntaxSection.style.display = 'none';
 
       header.classList.add('lct-word-header');
 
@@ -751,6 +776,172 @@
     panelElement.scrollTop = panelElement.scrollHeight;
   }
 
+  // ---- syntaxAnalysis 子字段流式更新 ----
+
+  function ensureSyntaxCardSkeleton() {
+    const section = panelElement.querySelector('.lct-progressive-syntax');
+    if (!section) return null;
+
+    // 已构建过则直接返回
+    if (section.querySelector('.lct-syntax-label')) return section;
+
+    // 清除骨架占位，构建 syntax card 结构
+    section.innerHTML = '';
+    section.style.display = 'block';
+
+    // 标题行
+    const titleRow = document.createElement('div');
+    titleRow.classList.add('lct-syntax-title-row');
+    const label = document.createElement('span');
+    label.classList.add('lct-syntax-label');
+    label.textContent = '语法拆解';
+    titleRow.appendChild(label);
+    section.appendChild(titleRow);
+
+    // 行内流式容器（初始隐藏，inlineComponents 到达后填充）
+    const flowContainer = document.createElement('div');
+    flowContainer.classList.add('lct-syntax-inline-flow');
+    flowContainer.style.display = 'none';
+    section.appendChild(flowContainer);
+
+    // 结构解析文本容器（初始隐藏，流式填充）
+    const explanation = document.createElement('div');
+    explanation.classList.add('lct-syntax-explanation');
+    explanation.style.display = 'none';
+    section.appendChild(explanation);
+
+    section.classList.add('lct-fade-in');
+    return section;
+  }
+
+  function updateSyntaxSubfield(subfield, value) {
+    if (!panelElement) return;
+
+    const section = ensureSyntaxCardSkeleton();
+    if (!section) return;
+
+    if (subfield === 'structureExplanation') {
+      const textNode = section.querySelector('.lct-syntax-explanation');
+      if (!textNode) return;
+
+      textNode.textContent = value;
+      textNode.style.display = '';
+
+      // 管理光标：只在当前活跃子字段末尾显示
+      section.querySelectorAll('.lct-cursor').forEach((c) => c.remove());
+      let cursor = textNode.querySelector('.lct-cursor');
+      if (!cursor) {
+        cursor = document.createElement('span');
+        cursor.classList.add('lct-cursor');
+        textNode.appendChild(cursor);
+      }
+
+      // 自动滚动到底部
+      panelElement.scrollTop = panelElement.scrollHeight;
+    }
+  }
+
+  function renderInlineComponents(container, inlineComponents, query) {
+    container.innerHTML = '';
+
+    // 无原句时降级为简单渲染
+    if (!query) {
+      inlineComponents.forEach((comp) => {
+        const span = document.createElement('span');
+        span.classList.add('lct-syntax-node');
+        span.setAttribute('data-role', comp.role);
+        span.setAttribute('data-type', comp.type);
+        if (comp.isOmitted) {
+          span.classList.add('lct-syntax-node--omitted');
+          span.textContent = '(' + comp.text + ')';
+        } else {
+          span.textContent = comp.text;
+        }
+        container.appendChild(span);
+      });
+      return;
+    }
+
+    // 滑动指针匹配算法：基于原句定位，100% 保留空格和标点
+    let currentIndex = 0;
+
+    inlineComponents.forEach((comp) => {
+      // 省略成分：在当前游标位置插入，不推进游标
+      if (comp.isOmitted) {
+        const span = document.createElement('span');
+        span.classList.add('lct-syntax-node', 'lct-syntax-node--omitted');
+        span.setAttribute('data-role', comp.role);
+        span.setAttribute('data-type', comp.type);
+        span.textContent = '(' + comp.text + ')';
+        container.appendChild(span);
+        return; // forEach 中的 return 等价于 continue
+      }
+
+      // 正常成分：在原句中查找精确匹配
+      const matchIndex = query.indexOf(comp.text, currentIndex);
+
+      if (matchIndex !== -1) {
+        // 截取未匹配的间隙（空格、标点、未标注的词）作为普通文本
+        if (matchIndex > currentIndex) {
+          container.appendChild(document.createTextNode(query.substring(currentIndex, matchIndex)));
+        }
+
+        // 创建高亮语法节点
+        const span = document.createElement('span');
+        span.classList.add('lct-syntax-node');
+        span.setAttribute('data-role', comp.role);
+        span.setAttribute('data-type', comp.type);
+        span.textContent = comp.text;
+        container.appendChild(span);
+
+        // 推进游标
+        currentIndex = matchIndex + comp.text.length;
+      } else {
+        // 大模型幻觉兜底：直接作为文本追加，防止渲染中断
+        container.appendChild(document.createTextNode(comp.text + ' '));
+      }
+    });
+
+    // 追加原句剩余部分（尾部标点等）
+    if (currentIndex < query.length) {
+      container.appendChild(document.createTextNode(query.substring(currentIndex)));
+    }
+  }
+
+  function buildSyntaxAnalysis(syntaxAnalysis, query) {
+    const card = document.createElement('div');
+    card.classList.add('lct-syntax-card');
+
+    if (!syntaxAnalysis) return card;
+
+    // 标题行
+    const titleRow = document.createElement('div');
+    titleRow.classList.add('lct-syntax-title-row');
+    const label = document.createElement('span');
+    label.classList.add('lct-syntax-label');
+    label.textContent = '语法拆解';
+    titleRow.appendChild(label);
+    card.appendChild(titleRow);
+
+    // 行内流式批注
+    if (syntaxAnalysis.inlineComponents && syntaxAnalysis.inlineComponents.length > 0) {
+      const flowContainer = document.createElement('div');
+      flowContainer.classList.add('lct-syntax-inline-flow');
+      renderInlineComponents(flowContainer, syntaxAnalysis.inlineComponents, query);
+      card.appendChild(flowContainer);
+    }
+
+    // 结构解析文本
+    if (syntaxAnalysis.structureExplanation) {
+      const explanation = document.createElement('div');
+      explanation.classList.add('lct-syntax-explanation');
+      explanation.textContent = syntaxAnalysis.structureExplanation;
+      card.appendChild(explanation);
+    }
+
+    return card;
+  }
+
   function showTimingBar(elapsed, modelId) {
     if (!panelElement) return;
 
@@ -828,12 +1019,46 @@
       addCoreTranslationButtons(data.contextAnalysis.coreTranslation);
     }
 
+    // 4c. 兜底补全 syntaxAnalysis
+    if (data.syntaxAnalysis && !data.isWord) {
+      ensureSyntaxCardSkeleton();
+      const syntaxSection = panelElement.querySelector('.lct-progressive-syntax');
+      if (syntaxSection) {
+        // 渲染行内语法批注
+        if (data.syntaxAnalysis.inlineComponents && data.syntaxAnalysis.inlineComponents.length > 0) {
+          let flowContainer = syntaxSection.querySelector('.lct-syntax-inline-flow');
+          if (!flowContainer) {
+            flowContainer = document.createElement('div');
+            flowContainer.classList.add('lct-syntax-inline-flow');
+            const titleRow = syntaxSection.querySelector('.lct-syntax-title-row');
+            if (titleRow) {
+              titleRow.after(flowContainer);
+            } else {
+              syntaxSection.appendChild(flowContainer);
+            }
+          }
+          flowContainer.style.display = '';
+          renderInlineComponents(flowContainer, data.syntaxAnalysis.inlineComponents, data.query);
+        }
+
+        // 确保 structureExplanation 完整
+        ensureFieldComplete('.lct-syntax-explanation', data.syntaxAnalysis.structureExplanation);
+        const explanation = syntaxSection.querySelector('.lct-syntax-explanation');
+        if (explanation && data.syntaxAnalysis.structureExplanation) explanation.style.display = '';
+      }
+    }
+
     // 5. 保存响应数据供复制按钮使用
     state.currentResponseData = data;
 
     // 6. 如果 definitions 尚未渲染
     if (data.definitions && !receivedData.definitions) {
       updateProgressiveField('definitions', data.definitions, { ...receivedData, ...data });
+    }
+
+    // 6. 如果 syntaxAnalysis 尚未渲染
+    if (data.syntaxAnalysis && !receivedData.syntaxAnalysis && !data.isWord) {
+      updateProgressiveField('syntaxAnalysis', data.syntaxAnalysis, { ...receivedData, ...data });
     }
 
     // 6. 如果 keyExpressions 尚未渲染
@@ -853,6 +1078,10 @@
     if (!data.keyExpressions || data.keyExpressions.length === 0) {
       const exprSection = panelElement.querySelector('.lct-progressive-expressions');
       if (exprSection) exprSection.style.display = 'none';
+    }
+    if (!data.syntaxAnalysis || data.isWord) {
+      const syntaxSection = panelElement.querySelector('.lct-progressive-syntax');
+      if (syntaxSection) syntaxSection.style.display = 'none';
     }
     if (data.isWord) {
       const transSection = panelElement.querySelector('.lct-progressive-translation');
@@ -916,14 +1145,24 @@
     } else {
       // 长句模式
       panelElement.appendChild(buildSentenceTranslation(data));
+
+      // 语境解析卡片
+      panelElement.appendChild(buildContextAnalysis(data));
+
+      // 语法拆解卡片（仅长句模式）
+      if (data.syntaxAnalysis) {
+        panelElement.appendChild(buildSyntaxAnalysis(data.syntaxAnalysis, data.query));
+      }
+
+      // 高级表达卡片（仅长句模式）
+      if (data.keyExpressions && data.keyExpressions.length > 0) {
+        panelElement.appendChild(buildKeyExpressions(data.keyExpressions));
+      }
     }
 
-    // 语境解析卡片
-    panelElement.appendChild(buildContextAnalysis(data));
-
-    // 高级表达卡片（仅长句模式）
-    if (!isWord && data.keyExpressions && data.keyExpressions.length > 0) {
-      panelElement.appendChild(buildKeyExpressions(data.keyExpressions));
+    if (isWord) {
+      // 语境解析卡片（单词模式在最后）
+      panelElement.appendChild(buildContextAnalysis(data));
     }
 
     // 底部状态栏占位（showTimingBar 会填充）
