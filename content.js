@@ -22,7 +22,8 @@
     isResizing: false,
     isVisible: false,
     dragOffset: { x: 0, y: 0 },
-    currentText: ''
+    currentText: '',
+    currentResponseData: null
   };
 
   // SVG 图标
@@ -30,7 +31,8 @@
     copy: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
     pin: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>',
     close: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
-    speaker: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>'
+    speaker: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>',
+    check: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
   };
 
   // ========== 区域 2: Shadow DOM 初始化 ==========
@@ -161,8 +163,10 @@
 
           case 'text':
             if (msg.name === 'translation') {
-              receivedData.translation = msg.value;
-              updateTranslationText(msg.value, receivedData);
+              if (!receivedData.isWord) {
+                receivedData.translation = msg.value;
+                updateTranslationText(msg.value, receivedData);
+              }
             } else if (msg.name.startsWith('contextAnalysis.')) {
               const subfield = msg.name.split('.')[1];
               updateContextSubfield(subfield, msg.value);
@@ -462,6 +466,10 @@
     }
 
     if (receivedData.isWord) {
+      // 单词模式：隐藏 translation 骨架（释义由 definitions 提供）
+      const transSection = panelElement.querySelector('.lct-progressive-translation');
+      if (transSection) transSection.style.display = 'none';
+
       header.classList.add('lct-word-header');
 
       const word = document.createElement('span');
@@ -654,19 +662,18 @@
       }
     }
 
-    // 4b. 兜底补全：确保所有文本字段有完整值
-    if (data.translation) {
+    // 4b. 兜底补全：确保所有文本字段有完整值（仅句子模式需要 translation）
+    if (!data.isWord && data.translation) {
       const transSection = panelElement.querySelector('.lct-progressive-translation');
       if (transSection && !transSection.querySelector('.lct-translation-streaming')) {
-        // translation 的 text 事件可能从未到达，手动创建
         transSection.innerHTML = '';
         transSection.style.display = 'block';
         const textEl = document.createElement('div');
         textEl.classList.add('lct-translation-streaming');
         transSection.appendChild(textEl);
       }
+      ensureFieldComplete('.lct-translation-streaming', data.translation);
     }
-    ensureFieldComplete('.lct-translation-streaming', data.translation);
     if (data.contextAnalysis) {
       // 确保 context card 已构建
       ensureContextCardSkeleton();
@@ -689,7 +696,10 @@
       addCoreTranslationButtons(data.contextAnalysis.coreTranslation);
     }
 
-    // 5. 如果 definitions 尚未渲染
+    // 5. 保存响应数据供复制按钮使用
+    state.currentResponseData = data;
+
+    // 6. 如果 definitions 尚未渲染
     if (data.definitions && !receivedData.definitions) {
       updateProgressiveField('definitions', data.definitions, { ...receivedData, ...data });
     }
@@ -711,6 +721,10 @@
     if (!data.keyExpressions || data.keyExpressions.length === 0) {
       const exprSection = panelElement.querySelector('.lct-progressive-expressions');
       if (exprSection) exprSection.style.display = 'none';
+    }
+    if (data.isWord) {
+      const transSection = panelElement.querySelector('.lct-progressive-translation');
+      if (transSection) transSection.style.display = 'none';
     }
 
     // 8. 应用查询词高亮
@@ -736,11 +750,11 @@
     copyBtn.title = '复制核心翻译';
     copyBtn.addEventListener('click', () => {
       navigator.clipboard.writeText(coreTranslationText);
-      copyBtn.classList.add('lct-copied');
-      setTimeout(() => copyBtn.classList.remove('lct-copied'), 1500);
+      showCopyFeedback(copyBtn);
     });
     core.appendChild(copyBtn);
   }
+
 
   function applyHighlighting(query) {
     if (!query || !panelElement) return;
@@ -976,8 +990,7 @@
       copyBtn.title = '复制核心翻译';
       copyBtn.addEventListener('click', () => {
         navigator.clipboard.writeText(data.contextAnalysis.coreTranslation);
-        copyBtn.classList.add('lct-copied');
-        setTimeout(() => copyBtn.classList.remove('lct-copied'), 1500);
+        showCopyFeedback(copyBtn);
       });
       core.appendChild(copyBtn);
 
@@ -1106,10 +1119,26 @@
     }
   }
 
+  function showCopyFeedback(btn) {
+    const originalHTML = btn.innerHTML;
+    btn.innerHTML = ICONS.check;
+    btn.classList.add('lct-copied');
+    setTimeout(() => {
+      btn.innerHTML = originalHTML;
+      btn.classList.remove('lct-copied');
+    }, 1500);
+  }
+
   function handleCopy(btn) {
-    navigator.clipboard.writeText(state.currentText).then(() => {
-      btn.classList.add('lct-copied');
-      setTimeout(() => btn.classList.remove('lct-copied'), 1500);
+    const data = state.currentResponseData;
+    let text;
+    if (data && data.isWord && data.definitions && data.definitions.length > 0) {
+      text = data.definitions.map((def) => `${def.partOfSpeech} ${def.meaning}`).join('\n');
+    } else {
+      text = state.currentText;
+    }
+    navigator.clipboard.writeText(text).then(() => {
+      showCopyFeedback(btn);
     });
   }
 

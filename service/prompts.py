@@ -16,7 +16,6 @@ JSON 格式如下：
   "query": "用户提供的原始单词/短语",
   "isWord": true,
   "phonetic": "国际音标，如 /ˈwɒtʃɪŋ/",
-  "translation": "主要中文释义（简洁）",
   "definitions": [
     {
       "partOfSpeech": "词性（如 n./v./adj./adv.）",

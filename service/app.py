@@ -49,7 +49,7 @@ class TranslateResponse(BaseModel):
     query: str
     isWord: bool
     phonetic: Optional[str] = None
-    translation: str = ""
+    translation: Optional[str] = None
     definitions: Optional[List[DefinitionItem]] = None
     contextAnalysis: Optional[ContextAnalysis] = None
 
@@ -105,7 +105,6 @@ def ensure_response_fields(data: dict, selected_text: str, word_mode: bool) -> d
 
     if word_mode:
         data.setdefault("phonetic", "")
-        data.setdefault("translation", "")
         data.setdefault("definitions", [])
     else:
         data.setdefault("phonetic", None)

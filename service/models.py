@@ -9,14 +9,8 @@ AVAILABLE_MODELS: list[dict] = [
     {
         "id": "THUDM/GLM-4-9B-0414",
         "name": "GLM-4-9B-0414",
-        "provider": "THUDM",
+        "provider": "Zhipu AI",
         "support_thinking": True,
-    },
-    {
-        "id": "THUDM/GLM-Z1-9B-0414",
-        "name": "GLM-Z1-9B-0414",
-        "provider": "THUDM",
-        "support_thinking": False,
     },
     {
         "id": "Pro/deepseek-ai/DeepSeek-V3.2",
@@ -25,17 +19,11 @@ AVAILABLE_MODELS: list[dict] = [
         "support_thinking": True,
     },
     {
-        "id": "Qwen/Qwen3-8B",
-        "name": "Qwen3 8B",
-        "provider": "Qwen",
-        "support_thinking": True,
-    },
-    {
-        "id": "tencent/Hunyuan-MT-7B",
-        "name": "Hunyuan-MT-7B",
-        "provider": "Tencent",
+        "id": "Pro/zai-org/GLM-5",
+        "name": "GLM-5",
+        "provider": "Zhipu AI",
         "support_thinking": False,
-    },
+    }
 ]
 
 # 默认模型为列表第一个

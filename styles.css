@@ -554,16 +554,15 @@
 }
 
 .lct-expression-item {
-  display: flex;
-  align-items: baseline;
-  gap: var(--lct-gap);
-  margin-bottom: 6px;
+  margin-bottom: 10px;
+  line-height: 1.5;
 }
 .lct-expression-item:last-child {
   margin-bottom: 0;
 }
 
 .lct-expression-phrase {
+  display: inline-block;
   font-size: var(--lct-font-size-xs);
   font-weight: 600;
   color: var(--lct-accent);
@@ -571,13 +570,15 @@
   padding: 2px 8px;
   border-radius: 4px;
   white-space: nowrap;
-  flex-shrink: 0;
+  margin-right: 6px;
+  vertical-align: baseline;
 }
 
 .lct-expression-meaning {
+  display: inline;
   font-size: var(--lct-font-size-sm);
   color: var(--lct-text-secondary);
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
 /* 渐进式 KeyExpressions 区域 */
