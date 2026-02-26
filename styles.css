@@ -1,0 +1,599 @@
+/* ========================================================================
+   styles.css — 翻译面板样式
+   注入到 Shadow DOM 内部，与宿主页面完全隔离
+   设计风格：Notion / Apple / Linear 现代简约
+   ======================================================================== */
+
+/* ========== CSS 变量系统 ========== */
+:host {
+  /* 颜色 */
+  --lct-bg: #FFFFFF;
+  --lct-bg-secondary: #F6F7F9;
+  --lct-text-primary: #1A1A1A;
+  --lct-text-secondary: #6B7280;
+  --lct-text-tertiary: #9CA3AF;
+  --lct-border: #E5E7EB;
+  --lct-accent: #3B82F6;
+  --lct-highlight-pink: #E11D48;
+  --lct-icon-default: #9CA3AF;
+  --lct-icon-hover-bg: #F3F4F6;
+  --lct-pin-active: #3B82F6;
+  --lct-copied-color: #10B981;
+
+  /* 阴影 */
+  --lct-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05),
+                0 10px 30px -5px rgba(0, 0, 0, 0.08);
+
+  /* 间距 */
+  --lct-padding: 16px;
+  --lct-padding-sm: 12px;
+  --lct-gap: 8px;
+  --lct-gap-lg: 12px;
+
+  /* 字体 */
+  --lct-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI',
+                     'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+                     sans-serif;
+  --lct-font-size-lg: 20px;
+  --lct-font-size-md: 14px;
+  --lct-font-size-sm: 13px;
+  --lct-font-size-xs: 12px;
+
+  /* 圆角 */
+  --lct-radius: 12px;
+  --lct-radius-sm: 8px;
+  --lct-radius-xs: 6px;
+
+  /* 动画 */
+  --lct-transition: 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ========== 面板基础 ========== */
+.lct-panel {
+  all: initial;
+  position: fixed;
+  width: 360px;
+  max-height: 480px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--lct-bg);
+  border-radius: var(--lct-radius);
+  box-shadow: var(--lct-shadow);
+  border: 1px solid var(--lct-border);
+  font-family: var(--lct-font-family);
+  font-size: var(--lct-font-size-md);
+  color: var(--lct-text-primary);
+  line-height: 1.6;
+  z-index: 2147483647;
+  display: none;
+  box-sizing: border-box;
+  opacity: 0;
+  transform: scale(0.96) translateY(-4px);
+  transition: opacity var(--lct-transition),
+              transform var(--lct-transition);
+}
+
+/* 面板内所有元素继承 box-sizing */
+.lct-panel *,
+.lct-panel *::before,
+.lct-panel *::after {
+  box-sizing: border-box;
+}
+
+/* 滚动条 */
+.lct-panel::-webkit-scrollbar {
+  width: 4px;
+}
+.lct-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+.lct-panel::-webkit-scrollbar-thumb {
+  background: var(--lct-text-tertiary);
+  border-radius: 2px;
+}
+.lct-panel::-webkit-scrollbar-thumb:hover {
+  background: var(--lct-text-secondary);
+}
+
+/* ========== 工具栏 ========== */
+.lct-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px 6px 12px;
+  border-bottom: 1px solid var(--lct-border);
+  user-select: none;
+}
+
+.lct-drag-zone {
+  flex: 1;
+  height: 28px;
+  cursor: grab;
+  display: flex;
+  align-items: center;
+}
+.lct-drag-zone:active {
+  cursor: grabbing;
+}
+
+/* 拖拽区域的视觉提示（6 个小圆点） */
+.lct-drag-dots {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+  width: 14px;
+  opacity: 0;
+  transition: opacity var(--lct-transition);
+}
+.lct-toolbar:hover .lct-drag-dots {
+  opacity: 0.4;
+}
+.lct-drag-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--lct-text-tertiary);
+}
+
+.lct-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* ========== 图标按钮 ========== */
+.lct-icon-btn {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--lct-radius-xs);
+  color: var(--lct-icon-default);
+  cursor: pointer;
+  transition: background var(--lct-transition),
+              color var(--lct-transition);
+  flex-shrink: 0;
+}
+.lct-icon-btn:hover {
+  background: var(--lct-icon-hover-bg);
+  color: var(--lct-text-secondary);
+}
+.lct-icon-btn.lct-active {
+  color: var(--lct-pin-active);
+  background: rgba(59, 130, 246, 0.08);
+}
+.lct-icon-btn.lct-copied {
+  color: var(--lct-copied-color);
+}
+
+.lct-icon-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* ========== 单词头部区域 ========== */
+.lct-word-header {
+  padding: var(--lct-padding-sm) var(--lct-padding) 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--lct-gap);
+  flex-wrap: wrap;
+}
+
+.lct-word {
+  font-size: var(--lct-font-size-lg);
+  font-weight: 700;
+  color: var(--lct-text-primary);
+  letter-spacing: -0.02em;
+}
+
+.lct-phonetic {
+  font-size: var(--lct-font-size-sm);
+  color: var(--lct-text-tertiary);
+  font-family: 'Lucida Sans Unicode', 'Arial Unicode MS', sans-serif;
+}
+
+.lct-speaker {
+  margin-left: 2px;
+  position: relative;
+  top: 2px;
+}
+
+/* ========== 释义与例句 ========== */
+.lct-definitions {
+  padding: var(--lct-gap-lg) var(--lct-padding) 0;
+}
+
+.lct-def-item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--lct-gap);
+  margin-bottom: 2px;
+}
+
+.lct-pos {
+  font-size: var(--lct-font-size-xs);
+  color: var(--lct-accent);
+  font-weight: 600;
+  background: rgba(59, 130, 246, 0.08);
+  padding: 1px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+  line-height: 1.8;
+}
+
+.lct-meaning {
+  font-size: var(--lct-font-size-md);
+  color: var(--lct-text-primary);
+  line-height: 1.6;
+}
+
+.lct-example {
+  font-size: var(--lct-font-size-sm);
+  color: var(--lct-text-secondary);
+  padding-left: 12px;
+  border-left: 2px solid var(--lct-border);
+  margin: 8px 0 2px;
+  line-height: 1.6;
+}
+
+.lct-example-trans {
+  font-size: var(--lct-font-size-xs);
+  color: var(--lct-text-tertiary);
+  padding-left: 12px;
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+
+/* 目标单词高亮 */
+.lct-highlight {
+  background: none;
+  color: var(--lct-highlight-pink);
+  font-weight: 500;
+}
+
+/* ========== 长句翻译区 ========== */
+.lct-sentence-section {
+  padding: var(--lct-padding-sm) var(--lct-padding);
+}
+
+.lct-original {
+  font-size: var(--lct-font-size-sm);
+  color: var(--lct-text-secondary);
+  margin-bottom: var(--lct-gap);
+  line-height: 1.6;
+}
+
+.lct-translation {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--lct-text-primary);
+  line-height: 1.6;
+}
+
+/* ========== 语境解析卡片 ========== */
+.lct-context-card {
+  margin: var(--lct-gap-lg) var(--lct-padding) var(--lct-padding);
+  padding: var(--lct-padding-sm) var(--lct-padding-sm);
+  background: var(--lct-bg-secondary);
+  border-radius: var(--lct-radius-sm);
+}
+
+.lct-context-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--lct-gap);
+  margin-bottom: 8px;
+}
+
+.lct-context-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--lct-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.lct-core-translation {
+  font-size: var(--lct-font-size-md);
+  font-weight: 700;
+  color: var(--lct-text-primary);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lct-analysis-text {
+  font-size: var(--lct-font-size-sm);
+  color: var(--lct-text-secondary);
+  line-height: 1.7;
+  margin-bottom: var(--lct-gap);
+}
+
+.lct-usage-text {
+  font-size: var(--lct-font-size-xs);
+  color: var(--lct-text-tertiary);
+  line-height: 1.6;
+  padding-top: 8px;
+  border-top: 1px solid var(--lct-border);
+}
+
+/* ========== 分隔线 ========== */
+.lct-divider {
+  height: 1px;
+  background: var(--lct-border);
+  margin: 0 var(--lct-padding);
+}
+
+/* ========== 缩放手柄 ========== */
+.lct-resize-handle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  opacity: 0;
+  transition: opacity var(--lct-transition);
+  border-radius: 0 0 var(--lct-radius) 0;
+}
+.lct-panel:hover .lct-resize-handle {
+  opacity: 0.35;
+}
+.lct-resize-handle:hover {
+  opacity: 0.7 !important;
+}
+
+/* 缩放手柄三条斜线 */
+.lct-resize-handle::before {
+  content: '';
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 10px;
+  height: 10px;
+  background:
+    linear-gradient(
+      135deg,
+      transparent 40%,
+      var(--lct-text-tertiary) 40%,
+      var(--lct-text-tertiary) 43%,
+      transparent 43%,
+      transparent 60%,
+      var(--lct-text-tertiary) 60%,
+      var(--lct-text-tertiary) 63%,
+      transparent 63%,
+      transparent 80%,
+      var(--lct-text-tertiary) 80%,
+      var(--lct-text-tertiary) 83%,
+      transparent 83%
+    );
+}
+
+/* ========== Loading 状态 ========== */
+.lct-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px var(--lct-padding);
+  color: var(--lct-text-tertiary);
+  font-size: var(--lct-font-size-sm);
+  gap: 8px;
+}
+
+.lct-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--lct-border);
+  border-top-color: var(--lct-accent);
+  border-radius: 50%;
+  animation: lct-spin 0.6s linear infinite;
+}
+
+@keyframes lct-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ========== 流式输出区域 ========== */
+.lct-streaming-container {
+  position: relative;
+  padding: var(--lct-padding-sm) var(--lct-padding);
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.lct-streaming-container::-webkit-scrollbar {
+  width: 4px;
+}
+.lct-streaming-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+.lct-streaming-container::-webkit-scrollbar-thumb {
+  background: var(--lct-text-tertiary);
+  border-radius: 2px;
+}
+
+.lct-streaming-text {
+  font-size: var(--lct-font-size-sm);
+  color: var(--lct-text-secondary);
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+}
+
+.lct-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: var(--lct-accent);
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  animation: lct-blink 0.8s step-end infinite;
+}
+
+@keyframes lct-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* ========== 渐进式渲染 ========== */
+
+.lct-fade-in {
+  animation: lct-fade-in 0.3s ease-out;
+}
+
+@keyframes lct-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 渐进式 Header 占位 */
+.lct-progressive-header {
+  align-items: baseline;
+  gap: var(--lct-gap);
+  flex-wrap: wrap;
+}
+
+/* 渐进式 Translation 区域 */
+.lct-progressive-translation {
+  padding: var(--lct-gap) var(--lct-padding);
+}
+
+.lct-translation-streaming {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--lct-text-primary);
+  line-height: 1.6;
+}
+
+/* 渐进式 Definitions 区域 */
+.lct-progressive-definitions {
+  padding: var(--lct-gap-lg) var(--lct-padding) 0;
+}
+
+/* 渐进式 Context 区域 */
+.lct-progressive-context {
+  margin: var(--lct-gap-lg) var(--lct-padding);
+  padding: var(--lct-padding-sm);
+  background: var(--lct-bg-secondary);
+  border-radius: var(--lct-radius-sm);
+}
+
+/* 流式加载指示器 */
+.lct-streaming-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px var(--lct-padding);
+  color: var(--lct-text-tertiary);
+  font-size: var(--lct-font-size-sm);
+  gap: 8px;
+}
+
+/* ========== Shimmer 骨架占位 ========== */
+.lct-skeleton-line {
+  height: 14px;
+  background: linear-gradient(90deg,
+    var(--lct-bg-secondary) 25%,
+    var(--lct-border) 50%,
+    var(--lct-bg-secondary) 75%);
+  background-size: 200% 100%;
+  animation: lct-shimmer 1.5s ease-in-out infinite;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+.lct-skeleton-line:last-child {
+  margin-bottom: 0;
+}
+.lct-skeleton-short { width: 40%; }
+.lct-skeleton-medium { width: 70%; }
+.lct-skeleton-long { width: 90%; }
+.lct-skeleton-thick { height: 20px; }
+
+@keyframes lct-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* 骨架容器间距 */
+.lct-progressive-header .lct-skeleton-line {
+  margin-bottom: 0;
+}
+
+/* ========== 高级表达卡片 ========== */
+.lct-expressions-card {
+  margin: var(--lct-gap) var(--lct-padding) var(--lct-padding);
+  padding: var(--lct-padding-sm) var(--lct-padding-sm);
+  background: var(--lct-bg-secondary);
+  border-radius: var(--lct-radius-sm);
+}
+
+.lct-expressions-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--lct-gap);
+  margin-bottom: 8px;
+}
+
+.lct-expressions-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--lct-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.lct-expression-item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--lct-gap);
+  margin-bottom: 6px;
+}
+.lct-expression-item:last-child {
+  margin-bottom: 0;
+}
+
+.lct-expression-phrase {
+  font-size: var(--lct-font-size-xs);
+  font-weight: 600;
+  color: var(--lct-accent);
+  background: rgba(59, 130, 246, 0.08);
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.lct-expression-meaning {
+  font-size: var(--lct-font-size-sm);
+  color: var(--lct-text-secondary);
+  line-height: 1.6;
+}
+
+/* 渐进式 KeyExpressions 区域 */
+.lct-progressive-expressions {
+  margin: var(--lct-gap) var(--lct-padding);
+  padding: var(--lct-padding-sm);
+  background: var(--lct-bg-secondary);
+  border-radius: var(--lct-radius-sm);
+}
+
+/* ========== 底部状态栏（耗时统计） ========== */
+.lct-status-bar {
+  padding: 6px var(--lct-padding);
+  font-size: var(--lct-font-size-xs);
+  color: var(--lct-text-tertiary);
+  border-top: 1px solid var(--lct-border);
+  text-align: right;
+  user-select: none;
+}

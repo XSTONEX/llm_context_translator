@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>划词翻译设置</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 300px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI',
+                   'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+                   sans-serif;
+      font-size: 14px;
+      color: #1a1a1a;
+      background: #ffffff;
+    }
+
+    .popup-container {
+      padding: 16px;
+    }
+
+    /* Header */
+    .popup-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .popup-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #1a1a1a;
+      letter-spacing: -0.01em;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #9ca3af;
+      flex-shrink: 0;
+    }
+
+    .status-dot.status-online {
+      background: #34c759;
+      animation: breathe-green 2s ease-in-out infinite;
+    }
+
+    .status-dot.status-offline {
+      background: #ff3b30;
+      animation: breathe-red 2s ease-in-out infinite;
+    }
+
+    .status-dot.status-checking {
+      background: #9ca3af;
+      animation: breathe-gray 1s ease-in-out infinite;
+    }
+
+    @keyframes breathe-green {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.4); }
+      50%      { box-shadow: 0 0 0 4px rgba(52, 199, 89, 0); }
+    }
+
+    @keyframes breathe-red {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.4); }
+      50%      { box-shadow: 0 0 0 4px rgba(255, 59, 48, 0); }
+    }
+
+    @keyframes breathe-gray {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0.3; }
+    }
+
+    /* Divider */
+    .popup-divider {
+      height: 1px;
+      background: #e5e7eb;
+      margin-bottom: 14px;
+    }
+
+    /* Controls */
+    .popup-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .control-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .control-label {
+      font-size: 14px;
+      color: #1a1a1a;
+      font-weight: 500;
+    }
+
+    /* iOS Toggle */
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      inset: 0;
+      background: #e5e7eb;
+      border-radius: 24px;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+
+    .toggle-slider::before {
+      content: '';
+      position: absolute;
+      left: 2px;
+      top: 2px;
+      width: 20px;
+      height: 20px;
+      background: #ffffff;
+      border-radius: 50%;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+      transition: transform 0.3s ease;
+    }
+
+    .toggle-switch input:checked + .toggle-slider {
+      background: #007AFF;
+    }
+
+    .toggle-switch input:checked + .toggle-slider::before {
+      transform: translateX(20px);
+    }
+
+    /* 初始化时禁用过渡动画，防止每次打开 popup 时开关闪动 */
+    .toggle-switch.no-transition .toggle-slider,
+    .toggle-switch.no-transition .toggle-slider::before {
+      transition: none !important;
+    }
+
+    /* API Input */
+    .api-input {
+      width: 170px;
+      height: 28px;
+      padding: 0 8px;
+      font-size: 12px;
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      color: #374151;
+      background: #f6f7f9;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .api-input:focus {
+      border-color: #007AFF;
+      box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.15);
+    }
+
+    .api-input::placeholder {
+      color: #9ca3af;
+    }
+
+    /* Model Select */
+    .model-select {
+      width: 170px;
+      height: 28px;
+      padding: 0 24px 0 8px;
+      font-size: 12px;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      color: #374151;
+      background: #f6f7f9;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      outline: none;
+      cursor: pointer;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 8px center;
+      background-size: 12px;
+    }
+
+    .model-select:focus {
+      border-color: #007AFF;
+      box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.15);
+    }
+
+    .model-select optgroup {
+      font-weight: 600;
+      color: #6b7280;
+      font-size: 11px;
+    }
+
+    .model-select option {
+      font-weight: 400;
+      color: #374151;
+      padding: 4px 8px;
+    }
+
+    /* Model Info */
+    .model-row {
+      justify-content: flex-start;
+    }
+
+    .model-info {
+      font-size: 12px;
+      color: #9ca3af;
+      font-weight: 400;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div class="popup-container">
+    <div class="popup-header">
+      <span class="popup-title">划词翻译</span>
+      <span class="status-dot" id="statusDot"></span>
+    </div>
+
+    <div class="popup-divider"></div>
+
+    <div class="popup-controls">
+      <div class="control-row">
+        <span class="control-label">划词翻译</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="enableToggle">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <div class="control-row">
+        <span class="control-label">后端地址</span>
+        <input
+          type="text"
+          id="apiBaseInput"
+          class="api-input"
+          placeholder="http://localhost:8000"
+          spellcheck="false"
+          autocomplete="off"
+        >
+      </div>
+
+      <div class="control-row">
+        <span class="control-label">翻译模型</span>
+        <select id="modelSelect" class="model-select">
+          <option value="">加载中...</option>
+        </select>
+      </div>
+
+      <div class="control-row model-row">
+        <span class="model-info" id="modelInfo">当前模型: --</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
