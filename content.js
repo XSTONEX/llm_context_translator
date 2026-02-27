@@ -91,6 +91,10 @@
   // ========== 区域 3: 选词监听 ==========
 
   let debounceTimer = null;
+  let activePort = null;
+  let toastElement = null;
+  let toastTimer = null;
+  let lastToggleValue = null;
 
   function handleMouseUp(event) {
     // 未启用时不处理新翻译
@@ -143,8 +147,15 @@
       // 显示渐进式面板骨架
       showProgressivePanel(rect);
 
+      // 断开已有的流式连接
+      if (activePort) {
+        try { activePort.disconnect(); } catch {}
+        activePort = null;
+      }
+
       // 通过 Port 长连接实现流式通信
-      const port = chrome.runtime.connect({ name: 'translate' });
+      activePort = chrome.runtime.connect({ name: 'translate' });
+      const port = activePort;
 
       // 跟踪已接收的数据
       const receivedData = {
@@ -194,6 +205,7 @@
             showTimingBar(elapsed, model);
             repositionPanel(rect);
             port.disconnect();
+            activePort = null;
             break;
           }
 
@@ -201,11 +213,13 @@
             console.error('[LCT] Stream error:', msg.message);
             hidePanel();
             port.disconnect();
+            activePort = null;
             break;
         }
       });
 
       port.onDisconnect.addListener(() => {
+        activePort = null;
         if (chrome.runtime.lastError) {
           console.error('[LCT] Port error:', chrome.runtime.lastError);
           hidePanel();
@@ -1423,6 +1437,77 @@
 
   // ========== 区域 6: 面板生命周期 ==========
 
+  function forceCleanup() {
+    // 清除防抖定时器
+    clearTimeout(debounceTimer);
+    debounceTimer = null;
+
+    // 中断进行中的流式翻译
+    if (activePort) {
+      try { activePort.disconnect(); } catch {}
+      activePort = null;
+    }
+
+    // 清理 TTS
+    cleanupTTS();
+
+    // 强制隐藏面板（无动画，忽略 isPinned）
+    if (panelElement) {
+      panelElement.style.transition = 'none';
+      panelElement.style.display = 'none';
+      panelElement.style.opacity = '0';
+      requestAnimationFrame(() => {
+        if (panelElement) panelElement.style.transition = '';
+      });
+    }
+
+    // 重置状态
+    state.isVisible = false;
+    state.isPinned = false;
+    state.isDragging = false;
+    state.isResizing = false;
+    state.currentText = '';
+    state.currentResponseData = null;
+  }
+
+  function handleToggle(enabled) {
+    if (enabled === lastToggleValue) return;
+    lastToggleValue = enabled;
+    state.enabled = enabled;
+
+    if (!enabled) {
+      forceCleanup();
+      showToast('划词翻译已关闭');
+    } else {
+      showToast('划词翻译已开启');
+    }
+  }
+
+  function showToast(message) {
+    if (!shadowRoot) return;
+
+    if (!toastElement) {
+      toastElement = document.createElement('div');
+      toastElement.classList.add('lct-toast');
+      shadowRoot.appendChild(toastElement);
+    }
+
+    clearTimeout(toastTimer);
+
+    toastElement.textContent = message;
+    toastElement.style.display = 'block';
+    toastElement.classList.remove('lct-toast-visible');
+    toastElement.offsetHeight; // 强制 reflow
+    toastElement.classList.add('lct-toast-visible');
+
+    toastTimer = setTimeout(() => {
+      toastElement.classList.remove('lct-toast-visible');
+      setTimeout(() => {
+        if (toastElement) toastElement.style.display = 'none';
+      }, 300);
+    }, 2000);
+  }
+
   function hidePanel() {
     if (!panelElement || !state.isVisible) return;
 
@@ -1621,11 +1706,20 @@
       state.enabled = result.enabled !== undefined ? result.enabled : true;
     });
 
-    // 监听 storage 变化，实时更新 enabled
+    // 监听 storage 变化（备用通道）
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area === 'local' && changes.enabled) {
-        state.enabled = changes.enabled.newValue;
+        handleToggle(changes.enabled.newValue);
       }
+    });
+
+    // 监听来自 background 的直接消息（主通道）
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      if (message.type === 'TOGGLE_ENABLED') {
+        handleToggle(message.enabled);
+        sendResponse({ received: true });
+      }
+      return false;
     });
 
     initShadowDOM();

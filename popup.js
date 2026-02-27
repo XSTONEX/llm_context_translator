@@ -39,7 +39,9 @@ function init() {
 
   // Toggle 切换事件
   enableToggle.addEventListener('change', () => {
-    chrome.storage.local.set({ enabled: enableToggle.checked });
+    const enabled = enableToggle.checked;
+    chrome.storage.local.set({ enabled });
+    chrome.runtime.sendMessage({ type: 'TOGGLE_ENABLED', enabled }).catch(() => {});
   });
 
   // 后端地址 blur 事件

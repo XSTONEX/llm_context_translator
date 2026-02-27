@@ -742,3 +742,31 @@
   text-align: right;
   user-select: none;
 }
+
+/* ========== Toast 通知 ========== */
+.lct-toast {
+  all: initial;
+  display: none;
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  padding: 8px 20px;
+  border-radius: 8px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+  z-index: 2147483647;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  white-space: nowrap;
+}
+
+.lct-toast-visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}

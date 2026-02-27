@@ -20,6 +20,12 @@ async function getApiBase() {
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== 'translate') return;
 
+  const abortController = new AbortController();
+
+  port.onDisconnect.addListener(() => {
+    abortController.abort();
+  });
+
   port.onMessage.addListener(async (msg) => {
     if (msg.type !== 'TRANSLATE_STREAM') return;
 
@@ -32,7 +38,8 @@ chrome.runtime.onConnect.addListener((port) => {
           selected_text: msg.text,
           context_sentence: msg.context || '',
           model: msg.model || null
-        })
+        }),
+        signal: abortController.signal
       });
 
       if (!response.ok) {
@@ -118,7 +125,31 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     return true;
   }
+
+  if (message.type === 'TOGGLE_ENABLED') {
+    broadcastToggle(message.enabled);
+    sendResponse({ success: true });
+    return false;
+  }
 });
+
+async function broadcastToggle(enabled) {
+  try {
+    const tabs = await chrome.tabs.query({});
+    for (const tab of tabs) {
+      try {
+        await chrome.tabs.sendMessage(tab.id, {
+          type: 'TOGGLE_ENABLED',
+          enabled
+        });
+      } catch {
+        // content script 未注入的标签页，静默忽略
+      }
+    }
+  } catch (err) {
+    console.error('[LCT] broadcastToggle error:', err);
+  }
+}
 
 async function fetchTranslation(text, context, model) {
   const apiBase = await getApiBase();
