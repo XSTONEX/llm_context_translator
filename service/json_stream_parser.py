@@ -6,11 +6,15 @@
 import json
 from typing import Any, Optional
 
-# LLM 输出 JSON 的已知字段顺序
-SIMPLE_FIELDS = ("query", "isWord", "phonetic")
+# 哨兵值：区分"JSON 尚未生成完毕"和"大模型明确输出的 null"
+_NOT_FOUND = object()
+
+# 默认英语单词模式字段（向后兼容）
+_DEFAULT_SIMPLE_FIELDS = ("query", "isWord", "phonetic")
+
+# 所有语言通用的字段
 STREAMING_FIELDS = ("translation",)
 COMPLEX_FIELDS = ("definitions", "syntaxAnalysis", "contextAnalysis", "keyExpressions")
-ALL_FIELDS = SIMPLE_FIELDS + STREAMING_FIELDS + COMPLEX_FIELDS
 CONTEXT_STREAMING_SUBFIELDS = ("coreTranslation", "analysis", "usage")
 SYNTAX_STREAMING_SUBFIELDS = ("structureExplanation",)
 
@@ -18,7 +22,9 @@ SYNTAX_STREAMING_SUBFIELDS = ("structureExplanation",)
 class JsonStreamParser:
     """增量 JSON 解析器，已知 schema，逐字段检测完成度并发射事件"""
 
-    def __init__(self):
+    def __init__(self, simple_fields: tuple[str, ...] = _DEFAULT_SIMPLE_FIELDS):
+        self.simple_fields = simple_fields
+        self.all_fields = self.simple_fields + STREAMING_FIELDS + COMPLEX_FIELDS
         self.buffer: str = ""
         self.emitted_fields: set[str] = set()
         self.last_translation_len: int = 0
@@ -49,10 +55,10 @@ class JsonStreamParser:
             pass
 
         # 2. 简单字段：完成后立即发射
-        for name in SIMPLE_FIELDS:
+        for name in self.simple_fields:
             if name not in self.emitted_fields:
                 val = self._try_extract_value(name)
-                if val is not None:
+                if val is not _NOT_FOUND:
                     self.emitted_fields.add(name)
                     events.append({"type": "field", "name": name, "value": val})
 
@@ -64,14 +70,14 @@ class JsonStreamParser:
                 events.append({"type": "text", "name": "translation", "value": partial})
             # 检查是否已完成
             complete = self._try_extract_value("translation")
-            if complete is not None:
+            if complete is not _NOT_FOUND:
                 self.emitted_fields.add("translation")
 
-        # 4. 复杂字段：完整后才发射
+        # 4. 复杂字段：完整后才发射（复杂字段不会是 null，无需区分 _NOT_FOUND）
         for name in COMPLEX_FIELDS:
             if name not in self.emitted_fields:
                 val = self._try_extract_complex(name)
-                if val is not None:
+                if val is not None and val is not _NOT_FOUND:
                     self.emitted_fields.add(name)
                     events.append({"type": "field", "name": name, "value": val})
 
@@ -104,7 +110,7 @@ class JsonStreamParser:
     def _emit_remaining(self, full: dict) -> list[dict]:
         """发射所有尚未发射的字段"""
         events = []
-        for name in ALL_FIELDS:
+        for name in self.all_fields:
             if name not in self.emitted_fields and name in full:
                 event_type = "text" if name in STREAMING_FIELDS else "field"
                 events.append({"type": event_type, "name": name, "value": full[name]})
@@ -123,17 +129,18 @@ class JsonStreamParser:
         return colon_pos + 1
 
     def _try_extract_value(self, name: str) -> Any:
-        """尝试提取一个已完成的 JSON 值（简单类型 + 字符串）"""
+        """尝试提取一个已完成的 JSON 值（简单类型 + 字符串）
+        返回 _NOT_FOUND 表示字段尚未就绪，返回 None 表示 JSON null"""
         value_start = self._find_key_colon(name)
         if value_start is None:
-            return None
+            return _NOT_FOUND
 
         # 跳过空白
         pos = value_start
         while pos < len(self.buffer) and self.buffer[pos] in " \t\n\r":
             pos += 1
         if pos >= len(self.buffer):
-            return None
+            return _NOT_FOUND
 
         char = self.buffer[pos]
 
@@ -147,20 +154,22 @@ class JsonStreamParser:
             return self._validate_literal(pos, 5, False)
         elif self.buffer[pos : pos + 4] == "null":
             return self._validate_literal(pos, 4, None)
-        return None
+        return _NOT_FOUND
 
     def _validate_literal(self, pos: int, length: int, value: Any) -> Any:
-        """验证字面值后面跟着 , 或 }"""
+        """验证字面值后面跟着 , 或 }
+        成功返回 value（可能是 None 表示 JSON null），未就绪返回 _NOT_FOUND"""
         end = pos + length
         if end > len(self.buffer):
-            return None
+            return _NOT_FOUND
         rest = self.buffer[end:].lstrip()
         if rest and rest[0] in ",}":
             return value
-        return None
+        return _NOT_FOUND
 
-    def _extract_complete_string(self, pos: int) -> Optional[str]:
-        """提取一个完整的 JSON 字符串值（必须已关闭引号且后跟 , 或 }）"""
+    def _extract_complete_string(self, pos: int) -> Any:
+        """提取一个完整的 JSON 字符串值（必须已关闭引号且后跟 , 或 }）
+        未就绪返回 _NOT_FOUND"""
         i = pos + 1
         while i < len(self.buffer):
             if self.buffer[i] == "\\":
@@ -173,25 +182,25 @@ class JsonStreamParser:
                     try:
                         return json.loads(self.buffer[pos : i + 1])
                     except json.JSONDecodeError:
-                        return None
-                return None
+                        return _NOT_FOUND
+                return _NOT_FOUND
             i += 1
-        return None
+        return _NOT_FOUND
 
-    def _extract_number(self, pos: int) -> Optional[Any]:
-        """提取一个数字值"""
+    def _extract_number(self, pos: int) -> Any:
+        """提取一个数字值，未就绪返回 _NOT_FOUND"""
         i = pos
         while i < len(self.buffer) and self.buffer[i] in "0123456789.-eE+":
             i += 1
         if i >= len(self.buffer):
-            return None
+            return _NOT_FOUND
         rest = self.buffer[i:].lstrip()
         if rest and rest[0] in ",}":
             try:
                 return json.loads(self.buffer[pos:i])
             except json.JSONDecodeError:
-                return None
-        return None
+                return _NOT_FOUND
+        return _NOT_FOUND
 
     def _extract_partial_string(self, name: str) -> Optional[str]:
         """提取字符串字段的部分内容（用于打字机效果）"""

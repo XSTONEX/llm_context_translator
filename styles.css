@@ -195,6 +195,27 @@
   font-family: 'Lucida Sans Unicode', 'Arial Unicode MS', sans-serif;
 }
 
+/* ---- 日语专属：假名 / 罗马音 / 辞書形 ---- */
+.lct-kana {
+  font-size: var(--lct-font-size-sm);
+  color: var(--lct-text-secondary);
+}
+
+.lct-romaji {
+  font-size: var(--lct-font-size-xs);
+  color: var(--lct-text-tertiary);
+  font-style: italic;
+}
+
+.lct-dictionary-form {
+  font-size: var(--lct-font-size-sm);
+  color: #2563EB;
+  background: #EFF6FF;
+  border-radius: 6px;
+  padding: 4px 10px;
+  margin: 0 16px 4px;
+}
+
 .lct-speaker {
   margin-left: 2px;
   position: relative;
@@ -408,6 +429,9 @@
 .lct-syntax-node[data-type="clause"] {
   border-bottom-color: #722ed1;
 }
+.lct-syntax-node[data-type="particle"] {
+  border-bottom-color: #eb2f96;
+}
 
 /* ---- 纯 CSS Tooltip 气泡 ---- */
 .lct-syntax-node::before {
@@ -455,6 +479,7 @@
 .lct-syntax-node[data-type="object"]::before { color: #52c41a; }
 .lct-syntax-node[data-type="modifier"]::before { color: #faad14; }
 .lct-syntax-node[data-type="clause"]::before { color: #722ed1; }
+.lct-syntax-node[data-type="particle"]::before { color: #eb2f96; }
 
 /* ---- 结构解析文本 ---- */
 .lct-syntax-explanation {

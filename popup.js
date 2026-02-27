@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', init);
 function init() {
   const statusDot = document.getElementById('statusDot');
   const enableToggle = document.getElementById('enableToggle');
+  const langSelect = document.getElementById('langSelect');
   const apiBaseInput = document.getElementById('apiBaseInput');
   const modelInfo = document.getElementById('modelInfo');
   const modelSelect = document.getElementById('modelSelect');
@@ -20,13 +21,14 @@ function init() {
   const toggleSwitch = enableToggle.closest('.toggle-switch');
   toggleSwitch.classList.add('no-transition');
 
-  chrome.storage.local.get(['enabled', 'apiBase', 'selectedModel'], (result) => {
+  chrome.storage.local.get(['enabled', 'apiBase', 'selectedModel', 'targetLang'], (result) => {
     const enabled = result.enabled !== undefined ? result.enabled : true;
     const apiBase = result.apiBase || DEFAULT_API_BASE;
     const savedModel = result.selectedModel || null;
 
     enableToggle.checked = enabled;
     apiBaseInput.value = apiBase;
+    langSelect.value = result.targetLang || 'en';
 
     // 强制重排后恢复过渡动画
     toggleSwitch.offsetHeight;
@@ -35,6 +37,11 @@ function init() {
     // 检测连通性 + 加载模型列表
     checkStatus(apiBase, statusDot, modelInfo);
     loadModels(apiBase, modelSelect, modelInfo, savedModel);
+  });
+
+  // 语言切换事件
+  langSelect.addEventListener('change', () => {
+    chrome.storage.local.set({ targetLang: langSelect.value });
   });
 
   // Toggle 切换事件

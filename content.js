@@ -42,6 +42,75 @@
     check: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
   };
 
+  // ========== 多语言元数据配置（数据驱动 UI 注入） ==========
+
+  const LANG_META_CONFIG = {
+    en: {
+      headerFields: [
+        { key: 'phonetic', cls: 'lct-phonetic', format: v => v }
+      ],
+      extraSections: []
+    },
+    ja: {
+      headerFields: [
+        { key: 'kana', cls: 'lct-kana', format: v => '【' + v + '】' },
+        { key: 'romaji', cls: 'lct-romaji', format: v => v }
+      ],
+      extraSections: [
+        {
+          key: 'dictionaryForm',
+          cls: 'lct-dictionary-form',
+          format: v => '原型（辞書形）：' + v,
+          insertBefore: '.lct-progressive-definitions',
+          condition: v => v != null && v !== ''
+        }
+      ]
+    }
+  };
+
+  /**
+   * 数据驱动渲染语言特有元数据字段
+   * 根据 LANG_META_CONFIG 配置将字段值注入 DOM
+   */
+  function renderLangMetaField(fieldName, value, lang) {
+    if (!panelElement || !value && value !== null) return;
+    const config = LANG_META_CONFIG[lang] || LANG_META_CONFIG.en;
+
+    // 检查是否为 header 字段（如 phonetic / kana / romaji）
+    const headerField = config.headerFields.find(f => f.key === fieldName);
+    if (headerField) {
+      if (!value) return; // null/空字符串不渲染 header 字段
+      const header = panelElement.querySelector('.lct-progressive-header');
+      if (header && !header.querySelector('.' + headerField.cls)) {
+        const el = document.createElement('span');
+        el.classList.add(headerField.cls);
+        el.textContent = headerField.format(value);
+        // 插入到 speaker 按钮之前
+        const speaker = header.querySelector('.lct-speaker');
+        if (speaker) {
+          header.insertBefore(el, speaker);
+        } else {
+          header.appendChild(el);
+        }
+      }
+      return;
+    }
+
+    // 检查是否为额外区块（如 dictionaryForm）
+    const section = config.extraSections.find(f => f.key === fieldName);
+    if (section && section.condition(value)) {
+      if (!panelElement.querySelector('.' + section.cls)) {
+        const el = document.createElement('div');
+        el.classList.add(section.cls, 'lct-fade-in');
+        el.textContent = section.format(value);
+        const target = panelElement.querySelector(section.insertBefore);
+        if (target) {
+          target.parentNode.insertBefore(el, target);
+        }
+      }
+    }
+  }
+
   // ========== 区域 2: Shadow DOM 初始化 ==========
 
   let shadowRoot = null;
@@ -127,9 +196,6 @@
 
     state.currentText = selectedText;
 
-    // 并发预加载 TTS（不阻塞翻译）
-    fetchTTS(selectedText);
-
     // 获取选区坐标
     const range = selection.getRangeAt(0);
     const rect = range.getBoundingClientRect();
@@ -140,9 +206,17 @@
     // 记录请求开始时间
     const startTime = Date.now();
 
-    // 从 storage 读取选中模型，然后发起请求
-    chrome.storage.local.get(['selectedModel'], (result) => {
+    // 从 storage 读取选中模型和目标语言，然后发起请求
+    chrome.storage.local.get(['selectedModel', 'targetLang'], (result) => {
       const model = result.selectedModel || null;
+      const lang = result.targetLang || 'en';
+
+      // TTS: 非日语立即并发; 日语延迟到流式拦截 kana/isWord
+      let ttsTriggered = false;
+      if (lang !== 'ja') {
+        fetchTTS(selectedText);
+        ttsTriggered = true;
+      }
 
       // 显示渐进式面板骨架
       showProgressivePanel(rect);
@@ -159,6 +233,7 @@
 
       // 跟踪已接收的数据
       const receivedData = {
+        lang: lang,
         query: null,
         isWord: null,
         phonetic: null,
@@ -173,7 +248,8 @@
         type: 'TRANSLATE_STREAM',
         text: selectedText,
         context: contextSentence,
-        model: model
+        model: model,
+        lang: lang
       });
 
       port.onMessage.addListener((msg) => {
@@ -181,6 +257,18 @@
           case 'field':
             receivedData[msg.name] = msg.value;
             updateProgressiveField(msg.name, msg.value, receivedData);
+            // 日语 TTS：根据流式信号精确触发
+            if (lang === 'ja' && !ttsTriggered) {
+              if (msg.name === 'isWord' && msg.value === false) {
+                // 句子：有上下文不会读错，直接用原文
+                fetchTTS(receivedData.query || selectedText);
+                ttsTriggered = true;
+              } else if (msg.name === 'kana' && msg.value) {
+                // 单词：用假名发音，避免汉字读错
+                fetchTTS(msg.value);
+                ttsTriggered = true;
+              }
+            }
             break;
 
           case 'text':
@@ -534,22 +622,12 @@
         }
         break;
 
-      case 'phonetic': {
-        const header = panelElement.querySelector('.lct-progressive-header');
-        if (header && header.style.display !== 'none' && value) {
-          const existing = header.querySelector('.lct-phonetic');
-          if (!existing) {
-            const phonetic = document.createElement('span');
-            phonetic.classList.add('lct-phonetic');
-            phonetic.textContent = value;
-            const wordSpan = header.querySelector('.lct-word');
-            if (wordSpan) {
-              wordSpan.after(phonetic);
-            }
-          }
-        }
+      case 'phonetic':
+      case 'kana':
+      case 'romaji':
+      case 'dictionaryForm':
+        renderLangMetaField(fieldName, value, receivedData.lang);
         break;
-      }
 
       case 'definitions': {
         const section = panelElement.querySelector('.lct-progressive-definitions');
@@ -587,7 +665,7 @@
         if (section && value && !section.querySelector('.lct-syntax-label')) {
           section.style.display = 'block';
           section.innerHTML = '';
-          const syntaxEl = buildSyntaxAnalysis(value, receivedData.query);
+          const syntaxEl = buildSyntaxAnalysis(value, receivedData.query, receivedData.lang);
           while (syntaxEl.firstChild) {
             section.appendChild(syntaxEl.firstChild);
           }
@@ -641,12 +719,16 @@
       word.textContent = receivedData.query;
       header.appendChild(word);
 
-      if (receivedData.phonetic) {
-        const phonetic = document.createElement('span');
-        phonetic.classList.add('lct-phonetic');
-        phonetic.textContent = receivedData.phonetic;
-        header.appendChild(phonetic);
-      }
+      // 数据驱动：渲染已到达的语言特有 header 字段
+      const langConfig = LANG_META_CONFIG[receivedData.lang] || LANG_META_CONFIG.en;
+      langConfig.headerFields.forEach((field) => {
+        if (receivedData[field.key]) {
+          const el = document.createElement('span');
+          el.classList.add(field.cls);
+          el.textContent = field.format(receivedData[field.key]);
+          header.appendChild(el);
+        }
+      });
 
       const speakerBtn = createIconButton('speaker', ICONS.speaker);
       speakerBtn.classList.add('lct-speaker');
@@ -855,10 +937,99 @@
     }
   }
 
-  function renderInlineComponents(container, inlineComponents, query) {
+  // ---- 双语法滑动窗口匹配 ----
+
+  /**
+   * 英语等有空格语言的语法渲染
+   * fallback 时追加尾部空格，gap 文本保留原样
+   */
+  function renderSpacedSyntax(container, components, query) {
+    let currentIndex = 0;
+
+    components.forEach((comp) => {
+      if (comp.isOmitted) {
+        const span = document.createElement('span');
+        span.classList.add('lct-syntax-node', 'lct-syntax-node--omitted');
+        span.setAttribute('data-role', comp.role);
+        span.setAttribute('data-type', comp.type);
+        span.textContent = '(' + comp.text + ')';
+        container.appendChild(span);
+        return;
+      }
+
+      const matchIndex = query.indexOf(comp.text, currentIndex);
+
+      if (matchIndex !== -1) {
+        if (matchIndex > currentIndex) {
+          container.appendChild(document.createTextNode(query.substring(currentIndex, matchIndex)));
+        }
+        const span = document.createElement('span');
+        span.classList.add('lct-syntax-node');
+        span.setAttribute('data-role', comp.role);
+        span.setAttribute('data-type', comp.type);
+        span.textContent = comp.text;
+        container.appendChild(span);
+        currentIndex = matchIndex + comp.text.length;
+      } else {
+        // 大模型幻觉兜底：带尾部空格
+        container.appendChild(document.createTextNode(comp.text + ' '));
+      }
+    });
+
+    if (currentIndex < query.length) {
+      container.appendChild(document.createTextNode(query.substring(currentIndex)));
+    }
+  }
+
+  /**
+   * 日语等无空格语言的语法渲染
+   * fallback 时不追加空格，避免日文排版割裂
+   */
+  function renderUnspacedSyntax(container, components, query) {
+    let currentIndex = 0;
+
+    components.forEach((comp) => {
+      if (comp.isOmitted) {
+        const span = document.createElement('span');
+        span.classList.add('lct-syntax-node', 'lct-syntax-node--omitted');
+        span.setAttribute('data-role', comp.role);
+        span.setAttribute('data-type', comp.type);
+        span.textContent = '(' + comp.text + ')';
+        container.appendChild(span);
+        return;
+      }
+
+      const matchIndex = query.indexOf(comp.text, currentIndex);
+
+      if (matchIndex !== -1) {
+        if (matchIndex > currentIndex) {
+          container.appendChild(document.createTextNode(query.substring(currentIndex, matchIndex)));
+        }
+        const span = document.createElement('span');
+        span.classList.add('lct-syntax-node');
+        span.setAttribute('data-role', comp.role);
+        span.setAttribute('data-type', comp.type);
+        span.textContent = comp.text;
+        container.appendChild(span);
+        currentIndex = matchIndex + comp.text.length;
+      } else {
+        // 大模型幻觉兜底：不加尾部空格
+        container.appendChild(document.createTextNode(comp.text));
+      }
+    });
+
+    if (currentIndex < query.length) {
+      container.appendChild(document.createTextNode(query.substring(currentIndex)));
+    }
+  }
+
+  /**
+   * 主控调度：根据语言选择对应的语法渲染算法
+   */
+  function renderInlineComponents(container, inlineComponents, query, lang) {
     container.innerHTML = '';
 
-    // 无原句时降级为简单渲染
+    // 无原句时降级为简单渲染（语言无关）
     if (!query) {
       inlineComponents.forEach((comp) => {
         const span = document.createElement('span');
@@ -876,53 +1047,15 @@
       return;
     }
 
-    // 滑动指针匹配算法：基于原句定位，100% 保留空格和标点
-    let currentIndex = 0;
-
-    inlineComponents.forEach((comp) => {
-      // 省略成分：在当前游标位置插入，不推进游标
-      if (comp.isOmitted) {
-        const span = document.createElement('span');
-        span.classList.add('lct-syntax-node', 'lct-syntax-node--omitted');
-        span.setAttribute('data-role', comp.role);
-        span.setAttribute('data-type', comp.type);
-        span.textContent = '(' + comp.text + ')';
-        container.appendChild(span);
-        return; // forEach 中的 return 等价于 continue
-      }
-
-      // 正常成分：在原句中查找精确匹配
-      const matchIndex = query.indexOf(comp.text, currentIndex);
-
-      if (matchIndex !== -1) {
-        // 截取未匹配的间隙（空格、标点、未标注的词）作为普通文本
-        if (matchIndex > currentIndex) {
-          container.appendChild(document.createTextNode(query.substring(currentIndex, matchIndex)));
-        }
-
-        // 创建高亮语法节点
-        const span = document.createElement('span');
-        span.classList.add('lct-syntax-node');
-        span.setAttribute('data-role', comp.role);
-        span.setAttribute('data-type', comp.type);
-        span.textContent = comp.text;
-        container.appendChild(span);
-
-        // 推进游标
-        currentIndex = matchIndex + comp.text.length;
-      } else {
-        // 大模型幻觉兜底：直接作为文本追加，防止渲染中断
-        container.appendChild(document.createTextNode(comp.text + ' '));
-      }
-    });
-
-    // 追加原句剩余部分（尾部标点等）
-    if (currentIndex < query.length) {
-      container.appendChild(document.createTextNode(query.substring(currentIndex)));
+    // 有原句时根据语言分派算法
+    if (lang === 'ja') {
+      renderUnspacedSyntax(container, inlineComponents, query);
+    } else {
+      renderSpacedSyntax(container, inlineComponents, query);
     }
   }
 
-  function buildSyntaxAnalysis(syntaxAnalysis, query) {
+  function buildSyntaxAnalysis(syntaxAnalysis, query, lang) {
     const card = document.createElement('div');
     card.classList.add('lct-syntax-card');
 
@@ -941,7 +1074,7 @@
     if (syntaxAnalysis.inlineComponents && syntaxAnalysis.inlineComponents.length > 0) {
       const flowContainer = document.createElement('div');
       flowContainer.classList.add('lct-syntax-inline-flow');
-      renderInlineComponents(flowContainer, syntaxAnalysis.inlineComponents, query);
+      renderInlineComponents(flowContainer, syntaxAnalysis.inlineComponents, query, lang);
       card.appendChild(flowContainer);
     }
 
@@ -995,7 +1128,7 @@
     if (data.query !== undefined && data.isWord !== undefined) {
       const header = panelElement.querySelector('.lct-progressive-header');
       if (header && !header.querySelector('.lct-word') && !header.querySelector('.lct-original')) {
-        renderProgressiveHeader(data);
+        renderProgressiveHeader({ ...data, lang: receivedData.lang });
       }
     }
 
@@ -1052,7 +1185,7 @@
             }
           }
           flowContainer.style.display = '';
-          renderInlineComponents(flowContainer, data.syntaxAnalysis.inlineComponents, data.query);
+          renderInlineComponents(flowContainer, data.syntaxAnalysis.inlineComponents, data.query, receivedData.lang);
         }
 
         // 确保 structureExplanation 完整
@@ -1061,6 +1194,15 @@
         if (explanation && data.syntaxAnalysis.structureExplanation) explanation.style.display = '';
       }
     }
+
+    // 4d. 兜底补全语言特有 extraSections（如日语 dictionaryForm）
+    const langConfig = LANG_META_CONFIG[receivedData.lang] || LANG_META_CONFIG.en;
+    langConfig.extraSections.forEach((section) => {
+      const val = data[section.key];
+      if (val !== undefined && section.condition(val) && !panelElement.querySelector('.' + section.cls)) {
+        renderLangMetaField(section.key, val, receivedData.lang);
+      }
+    });
 
     // 5. 保存响应数据供复制按钮使用
     state.currentResponseData = data;
@@ -1145,7 +1287,7 @@
 
   // ---- 最终面板渲染（非流式降级路径） ----
 
-  function renderPanel(data, isWord) {
+  function renderPanel(data, isWord, lang) {
     ensurePanel();
     panelElement.innerHTML = '';
 
@@ -1154,7 +1296,7 @@
 
     if (isWord) {
       // 单词模式
-      panelElement.appendChild(buildWordHeader(data));
+      panelElement.appendChild(buildWordHeader(data, lang));
       panelElement.appendChild(buildDefinitions(data));
     } else {
       // 长句模式
@@ -1165,7 +1307,7 @@
 
       // 语法拆解卡片（仅长句模式）
       if (data.syntaxAnalysis) {
-        panelElement.appendChild(buildSyntaxAnalysis(data.syntaxAnalysis, data.query));
+        panelElement.appendChild(buildSyntaxAnalysis(data.syntaxAnalysis, data.query, lang));
       }
 
       // 高级表达卡片（仅长句模式）
@@ -1240,7 +1382,7 @@
     return btn;
   }
 
-  function buildWordHeader(data) {
+  function buildWordHeader(data, lang) {
     const header = document.createElement('div');
     header.classList.add('lct-word-header');
 
@@ -1249,12 +1391,16 @@
     word.textContent = data.query;
     header.appendChild(word);
 
-    if (data.phonetic) {
-      const phonetic = document.createElement('span');
-      phonetic.classList.add('lct-phonetic');
-      phonetic.textContent = data.phonetic;
-      header.appendChild(phonetic);
-    }
+    // 数据驱动：渲染语言特有 header 字段
+    const langConfig = LANG_META_CONFIG[lang] || LANG_META_CONFIG.en;
+    langConfig.headerFields.forEach((field) => {
+      if (data[field.key]) {
+        const el = document.createElement('span');
+        el.classList.add(field.cls);
+        el.textContent = field.format(data[field.key]);
+        header.appendChild(el);
+      }
+    });
 
     const speakerBtn = createIconButton('speaker', ICONS.speaker);
     speakerBtn.classList.add('lct-speaker');

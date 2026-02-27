@@ -11,13 +11,8 @@ from pydantic import BaseModel
 
 from config import DEERAPI_BASE_URL, DEERAPI_KEY, SILICONFLOW_API_KEY, LLM_API_BASE_URL
 from json_stream_parser import JsonStreamParser
+from language_strategy import get_strategy
 from models import DEFAULT_MODEL, get_models_response, model_supports_thinking, resolve_model
-from prompts import (
-    SENTENCE_SYSTEM_PROMPT,
-    WORD_SYSTEM_PROMPT,
-    build_user_prompt,
-    is_word_mode,
-)
 
 # ========== Pydantic 数据模型 ==========
 
@@ -31,6 +26,7 @@ class TranslateRequest(BaseModel):
     selected_text: str
     context_sentence: str = ""
     model: Optional[str] = None
+    lang: str = "en"
 
 
 class ExampleItem(BaseModel):
@@ -122,31 +118,6 @@ def parse_llm_response(content: str, selected_text: str, word_mode: bool) -> dic
     raise ValueError(f"无法解析 LLM 返回内容为 JSON: {content[:200]}")
 
 
-def ensure_response_fields(data: dict, selected_text: str, word_mode: bool) -> dict:
-    """确保响应包含所有必需字段"""
-    data.setdefault("query", selected_text)
-    data.setdefault("isWord", word_mode)
-
-    if word_mode:
-        data.setdefault("phonetic", "")
-        data.setdefault("definitions", [])
-    else:
-        data.setdefault("translation", "")
-        data.setdefault("keyExpressions", [])
-        data.setdefault("syntaxAnalysis", {
-            "inlineComponents": [],
-            "structureExplanation": "",
-        })
-
-    data.setdefault("contextAnalysis", {
-        "coreTranslation": "",
-        "analysis": "",
-        "usage": "",
-    })
-
-    return data
-
-
 # ========== 流式端点 ==========
 
 
@@ -155,11 +126,13 @@ async def stream_llm_response(
     selected_text: str,
     context_sentence: str,
     model: Optional[str] = None,
+    lang: str = "en",
 ) -> AsyncGenerator[str, None]:
     """流式调用 LLM API，通过增量解析器输出结构化 SSE 事件"""
-    word_mode = is_word_mode(selected_text)
-    system_prompt = WORD_SYSTEM_PROMPT if word_mode else SENTENCE_SYSTEM_PROMPT
-    user_prompt = build_user_prompt(selected_text, context_sentence)
+    strategy = get_strategy(lang)
+    word_mode = strategy.is_word_mode(selected_text)
+    system_prompt = strategy.get_word_prompt() if word_mode else strategy.get_sentence_prompt()
+    user_prompt = strategy.build_user_prompt(selected_text, context_sentence)
     actual_model = resolve_model(model)
 
     url = f"{LLM_API_BASE_URL}/chat/completions"
@@ -179,7 +152,7 @@ async def stream_llm_response(
     if model_supports_thinking(actual_model):
         payload["enable_thinking"] = False
 
-    parser = JsonStreamParser()
+    parser = JsonStreamParser(simple_fields=strategy.get_schema_fields(word_mode))
 
     try:
         async with session.post(url, json=payload, headers=headers) as resp:
@@ -223,7 +196,7 @@ async def stream_llm_response(
                 yield f"data: {json.dumps({'type': 'error', 'message': '无法解析 LLM 返回的 JSON'})}\n\n"
                 return
 
-        full_data = ensure_response_fields(full_data, selected_text, word_mode)
+        full_data = strategy.ensure_response_fields(full_data, selected_text, word_mode)
         # 发射所有未发射的字段
         remaining = parser._emit_remaining(full_data)
         for event in remaining:
@@ -240,6 +213,7 @@ async def translate_stream(req: TranslateRequest):
             req.selected_text,
             req.context_sentence,
             req.model,
+            req.lang,
         ),
         media_type="text/event-stream",
         headers={
@@ -253,12 +227,13 @@ async def translate_stream(req: TranslateRequest):
 # ========== 非流式端点（调试用） ==========
 
 
-@app.post("/translate", response_model=TranslateResponse)
+@app.post("/translate")
 async def translate(req: TranslateRequest):
-    """非流式翻译端点"""
-    word_mode = is_word_mode(req.selected_text)
-    system_prompt = WORD_SYSTEM_PROMPT if word_mode else SENTENCE_SYSTEM_PROMPT
-    user_prompt = build_user_prompt(req.selected_text, req.context_sentence)
+    """非流式翻译端点（调试用）"""
+    strategy = get_strategy(req.lang)
+    word_mode = strategy.is_word_mode(req.selected_text)
+    system_prompt = strategy.get_word_prompt() if word_mode else strategy.get_sentence_prompt()
+    user_prompt = strategy.build_user_prompt(req.selected_text, req.context_sentence)
     actual_model = resolve_model(req.model)
 
     url = f"{LLM_API_BASE_URL}/chat/completions"
@@ -298,7 +273,7 @@ async def translate(req: TranslateRequest):
     except ValueError as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-    data = ensure_response_fields(data, req.selected_text, word_mode)
+    data = strategy.ensure_response_fields(data, req.selected_text, word_mode)
     return data
 
 

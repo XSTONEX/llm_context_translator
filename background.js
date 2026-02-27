@@ -37,7 +37,8 @@ chrome.runtime.onConnect.addListener((port) => {
         body: JSON.stringify({
           selected_text: msg.text,
           context_sentence: msg.context || '',
-          model: msg.model || null
+          model: msg.model || null,
+          lang: msg.lang || 'en'
         }),
         signal: abortController.signal
       });
@@ -115,7 +116,7 @@ chrome.runtime.onConnect.addListener((port) => {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'TRANSLATE') {
-    fetchTranslation(message.text, message.context, message.model)
+    fetchTranslation(message.text, message.context, message.model, message.lang)
       .then((data) => {
         sendResponse({ success: true, data });
       })
@@ -151,7 +152,7 @@ async function broadcastToggle(enabled) {
   }
 }
 
-async function fetchTranslation(text, context, model) {
+async function fetchTranslation(text, context, model, lang) {
   const apiBase = await getApiBase();
   const response = await fetch(`${apiBase}/translate`, {
     method: 'POST',
@@ -159,7 +160,8 @@ async function fetchTranslation(text, context, model) {
     body: JSON.stringify({
       selected_text: text,
       context_sentence: context || '',
-      model: model || null
+      model: model || null,
+      lang: lang || 'en'
     })
   });
 
