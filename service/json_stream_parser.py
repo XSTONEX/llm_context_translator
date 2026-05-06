@@ -14,7 +14,7 @@ _DEFAULT_SIMPLE_FIELDS = ("query", "isWord", "phonetic")
 
 # 所有语言通用的字段
 STREAMING_FIELDS = ("translation",)
-COMPLEX_FIELDS = ("definitions", "syntaxAnalysis", "contextAnalysis", "keyExpressions")
+COMPLEX_FIELDS = ("morphology", "definitions", "syntaxAnalysis", "contextAnalysis", "keyExpressions")
 CONTEXT_STREAMING_SUBFIELDS = ("coreTranslation", "analysis", "usage")
 SYNTAX_STREAMING_SUBFIELDS = ("structureExplanation",)
 
@@ -47,7 +47,7 @@ class JsonStreamParser:
         # 1. 尝试完整解析
         try:
             full = json.loads(self.buffer)
-            events.extend(self._emit_remaining(full))
+            events.extend(self.emit_remaining(full))
             events.append({"type": "done", "data": full})
             self.is_done = True
             return events
@@ -107,7 +107,7 @@ class JsonStreamParser:
 
         return events
 
-    def _emit_remaining(self, full: dict) -> list[dict]:
+    def emit_remaining(self, full: dict) -> list[dict]:
         """发射所有尚未发射的字段"""
         events = []
         for name in self.all_fields:
@@ -116,6 +116,10 @@ class JsonStreamParser:
                 events.append({"type": event_type, "name": name, "value": full[name]})
                 self.emitted_fields.add(name)
         return events
+
+    def _emit_remaining(self, full: dict) -> list[dict]:
+        """Backward-compatible alias for older callers."""
+        return self.emit_remaining(full)
 
     def _find_key_colon(self, name: str) -> Optional[int]:
         """找到 "name": 之后的位置（value 起始处）"""

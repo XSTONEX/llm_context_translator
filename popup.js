@@ -1,147 +1,176 @@
 // ========================================================================
 // popup.js — Popup 控制面板逻辑
-// 职责：读写 chrome.storage、检测后端连通性、展示/切换模型
 // ========================================================================
 
 'use strict';
 
 const STATUS_CHECK_TIMEOUT = 3000;
+const HISTORY_LIMIT = 50;
 
 document.addEventListener('DOMContentLoaded', init);
 
 function init() {
-  const statusDot = document.getElementById('statusDot');
-  const enableToggle = document.getElementById('enableToggle');
-  const langSelect = document.getElementById('langSelect');
-  const apiBaseInput = document.getElementById('apiBaseInput');
-  const modelInfo = document.getElementById('modelInfo');
-  const modelSelect = document.getElementById('modelSelect');
+  const els = {
+    statusDot: document.getElementById('statusDot'),
+    enableToggle: document.getElementById('enableToggle'),
+    langSelect: document.getElementById('langSelect'),
+    apiBaseInput: document.getElementById('apiBaseInput'),
+    modelInfo: document.getElementById('modelInfo'),
+    modelSelect: document.getElementById('modelSelect'),
+    favoritesList: document.getElementById('favoritesList'),
+    historyList: document.getElementById('historyList'),
+  };
 
-  // 加载已保存的设置（禁用过渡动画，防止开关闪动）
-  const toggleSwitch = enableToggle.closest('.toggle-switch');
+  const toggleSwitch = els.enableToggle.closest('.toggle-switch');
   toggleSwitch.classList.add('no-transition');
 
-  chrome.storage.local.get(['enabled', 'apiBase', 'selectedModel', 'targetLang'], (result) => {
-    const enabled = result.enabled !== undefined ? result.enabled : true;
-    const apiBase = result.apiBase || DEFAULT_API_BASE;
-    const savedModel = result.selectedModel || null;
+  chrome.storage.local.get(
+    ['enabled', 'apiBase', 'selectedModel', 'sourceLangMode', 'targetLang', 'lookupHistory', 'favoriteLookups'],
+    (result) => {
+      const enabled = result.enabled !== undefined ? result.enabled : true;
+      const apiBase = result.apiBase || DEFAULT_API_BASE;
+      const savedModel = result.selectedModel || null;
+      const sourceLangMode = result.sourceLangMode || result.targetLang || 'auto';
 
-    enableToggle.checked = enabled;
-    apiBaseInput.value = apiBase;
-    langSelect.value = result.targetLang || 'en';
+      els.enableToggle.checked = enabled;
+      els.apiBaseInput.value = apiBase;
+      els.langSelect.value = sourceLangMode;
 
-    // 强制重排后恢复过渡动画
-    toggleSwitch.offsetHeight;
-    toggleSwitch.classList.remove('no-transition');
+      toggleSwitch.offsetHeight;
+      toggleSwitch.classList.remove('no-transition');
 
-    // 检测连通性 + 加载模型列表
-    checkStatus(apiBase, statusDot, modelInfo);
-    loadModels(apiBase, modelSelect, modelInfo, savedModel);
+      checkStatus(apiBase, els.statusDot, els.modelInfo);
+      loadModels(apiBase, els.modelSelect, els.modelInfo, savedModel);
+      renderLookupList(els.historyList, result.lookupHistory || [], { removable: false });
+      renderLookupList(els.favoritesList, result.favoriteLookups || [], { removable: true });
+    },
+  );
+
+  els.langSelect.addEventListener('change', () => {
+    chrome.storage.local.set({
+      sourceLangMode: els.langSelect.value,
+      targetLang: els.langSelect.value === 'auto' ? 'en' : els.langSelect.value,
+    });
   });
 
-  // 语言切换事件
-  langSelect.addEventListener('change', () => {
-    chrome.storage.local.set({ targetLang: langSelect.value });
-  });
-
-  // Toggle 切换事件
-  enableToggle.addEventListener('change', () => {
-    const enabled = enableToggle.checked;
+  els.enableToggle.addEventListener('change', () => {
+    const enabled = els.enableToggle.checked;
     chrome.storage.local.set({ enabled });
     chrome.runtime.sendMessage({ type: 'TOGGLE_ENABLED', enabled }).catch(() => {});
   });
 
-  // 后端地址 blur 事件
-  apiBaseInput.addEventListener('blur', () => {
-    let value = apiBaseInput.value.trim();
-    if (!value) {
-      value = DEFAULT_API_BASE;
-      apiBaseInput.value = value;
-    }
+  els.apiBaseInput.addEventListener('blur', () => {
+    let value = els.apiBaseInput.value.trim();
+    if (!value) value = DEFAULT_API_BASE;
     value = value.replace(/\/+$/, '');
-    apiBaseInput.value = value;
+    els.apiBaseInput.value = value;
 
     chrome.storage.local.set({ apiBase: value });
-    checkStatus(value, statusDot, modelInfo);
-    loadModels(value, modelSelect, modelInfo, null);
+    checkStatus(value, els.statusDot, els.modelInfo);
+    loadModels(value, els.modelSelect, els.modelInfo, null);
   });
 
-  // Enter 键触发 blur
-  apiBaseInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') apiBaseInput.blur();
+  els.apiBaseInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') els.apiBaseInput.blur();
   });
 
-  // 模型选择变更
-  modelSelect.addEventListener('change', () => {
-    const selectedId = modelSelect.value;
+  els.modelSelect.addEventListener('change', () => {
+    const selectedId = els.modelSelect.value;
     chrome.storage.local.set({ selectedModel: selectedId });
+    const selectedOption = els.modelSelect.options[els.modelSelect.selectedIndex];
+    els.modelInfo.textContent = selectedOption ? '当前模型: ' + selectedOption.text : '当前模型: --';
+  });
 
-    const selectedOption = modelSelect.options[modelSelect.selectedIndex];
-    modelInfo.textContent = '当前模型: ' + selectedOption.text;
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local') return;
+    if (changes.lookupHistory) {
+      renderLookupList(els.historyList, changes.lookupHistory.newValue || [], { removable: false });
+    }
+    if (changes.favoriteLookups) {
+      renderLookupList(els.favoritesList, changes.favoriteLookups.newValue || [], { removable: true });
+    }
   });
 }
 
 async function loadModels(apiBase, selectEl, modelInfoEl, savedModel) {
+  selectEl.disabled = true;
+  selectEl.innerHTML = '<option value="">加载中...</option>';
+  modelInfoEl.textContent = '当前模型: 正在加载';
+
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), STATUS_CHECK_TIMEOUT);
 
-    const response = await fetch(`${apiBase}/api/models`, {
-      signal: controller.signal,
-    });
+    const response = await fetch(`${apiBase}/api/models`, { signal: controller.signal });
     clearTimeout(timeoutId);
-
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const data = await response.json();
-    const models = data.models;
+    const models = Array.isArray(data.models) ? data.models : [];
     const defaultModelId = data.default;
 
-    // 清空并重建下拉选项
     selectEl.innerHTML = '';
-
-    // 按 provider 分组
     const groups = {};
     for (const model of models) {
-      if (!groups[model.provider]) {
-        groups[model.provider] = [];
-      }
+      if (!groups[model.provider]) groups[model.provider] = [];
       groups[model.provider].push(model);
     }
 
-    // 构建 optgroup
     for (const [provider, providerModels] of Object.entries(groups)) {
       const optgroup = document.createElement('optgroup');
       optgroup.label = provider;
-
       for (const model of providerModels) {
         const option = document.createElement('option');
         option.value = model.id;
         option.textContent = model.name;
         optgroup.appendChild(option);
       }
-
       selectEl.appendChild(optgroup);
     }
 
-    // 设置选中值
     const targetModel = savedModel || defaultModelId;
-    if (targetModel) {
-      selectEl.value = targetModel;
-    }
+    if (targetModel) selectEl.value = targetModel;
+    if (!selectEl.value && selectEl.options.length > 0) selectEl.selectedIndex = 0;
 
-    // 更新模型信息显示
     const selectedOption = selectEl.options[selectEl.selectedIndex];
-    if (selectedOption) {
-      modelInfoEl.textContent = '当前模型: ' + selectedOption.text;
-    }
-
-    // 缓存模型列表到 storage（供 content.js 显示名查找）
+    modelInfoEl.textContent = selectedOption ? '当前模型: ' + selectedOption.text : '当前模型: 无可用模型';
+    selectEl.disabled = models.length === 0;
     chrome.storage.local.set({ modelList: models });
-
   } catch {
-    selectEl.innerHTML = '<option value="">加载失败</option>';
+    chrome.storage.local.get(['modelList', 'selectedModel'], (result) => {
+      const cachedModels = Array.isArray(result.modelList) ? result.modelList : [];
+      if (cachedModels.length > 0) {
+        hydrateModelSelect(selectEl, cachedModels, result.selectedModel);
+        modelInfoEl.textContent = '当前模型: 使用缓存列表';
+        selectEl.disabled = false;
+      } else {
+        selectEl.innerHTML = '<option value="">加载失败</option>';
+        selectEl.disabled = true;
+        modelInfoEl.textContent = '当前模型: 连接失败';
+      }
+    });
   }
+}
+
+function hydrateModelSelect(selectEl, models, savedModel) {
+  selectEl.innerHTML = '';
+  const groups = {};
+  for (const model of models) {
+    if (!groups[model.provider]) groups[model.provider] = [];
+    groups[model.provider].push(model);
+  }
+  for (const [provider, providerModels] of Object.entries(groups)) {
+    const optgroup = document.createElement('optgroup');
+    optgroup.label = provider;
+    for (const model of providerModels) {
+      const option = document.createElement('option');
+      option.value = model.id;
+      option.textContent = model.name;
+      optgroup.appendChild(option);
+    }
+    selectEl.appendChild(optgroup);
+  }
+  if (savedModel) selectEl.value = savedModel;
 }
 
 async function checkStatus(apiBase, statusDot, modelInfo) {
@@ -151,13 +180,9 @@ async function checkStatus(apiBase, statusDot, modelInfo) {
   const timeoutId = setTimeout(() => controller.abort(), STATUS_CHECK_TIMEOUT);
 
   try {
-    const response = await fetch(`${apiBase}/api/status`, {
-      signal: controller.signal,
-    });
+    const response = await fetch(`${apiBase}/api/status`, { signal: controller.signal });
     clearTimeout(timeoutId);
-
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
     setStatusDot(statusDot, 'online');
   } catch {
     clearTimeout(timeoutId);
@@ -169,4 +194,72 @@ async function checkStatus(apiBase, statusDot, modelInfo) {
 function setStatusDot(dot, status) {
   dot.className = 'status-dot';
   dot.classList.add(`status-${status}`);
+}
+
+function renderLookupList(container, items, options) {
+  container.innerHTML = '';
+  const visible = Array.isArray(items) ? items.slice(0, HISTORY_LIMIT) : [];
+  if (visible.length === 0) {
+    const empty = document.createElement('div');
+    empty.classList.add('empty-state');
+    empty.textContent = options.removable ? '暂无收藏' : '暂无记录';
+    container.appendChild(empty);
+    return;
+  }
+
+  visible.forEach((item) => {
+    const row = document.createElement('div');
+    row.classList.add('lookup-item');
+
+    const main = document.createElement('div');
+    main.classList.add('lookup-main');
+    const query = document.createElement('div');
+    query.classList.add('lookup-query');
+    query.textContent = item.query || '--';
+    main.appendChild(query);
+    const sub = document.createElement('div');
+    sub.classList.add('lookup-sub');
+    sub.textContent = [langLabel(item.lang), item.coreTranslation].filter(Boolean).join(' · ');
+    main.appendChild(sub);
+    row.appendChild(main);
+
+    const actions = document.createElement('div');
+    actions.classList.add('lookup-actions');
+    const copyBtn = document.createElement('button');
+    copyBtn.classList.add('mini-btn');
+    copyBtn.textContent = '复制';
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(item.query || '');
+    });
+    actions.appendChild(copyBtn);
+
+    if (options.removable) {
+      const removeBtn = document.createElement('button');
+      removeBtn.classList.add('mini-btn');
+      removeBtn.textContent = '删除';
+      removeBtn.addEventListener('click', () => removeFavorite(item));
+      actions.appendChild(removeBtn);
+    }
+
+    row.appendChild(actions);
+    container.appendChild(row);
+  });
+}
+
+function removeFavorite(item) {
+  chrome.storage.local.get(['favoriteLookups'], (result) => {
+    const favorites = Array.isArray(result.favoriteLookups) ? result.favoriteLookups : [];
+    const target = lookupKey(item);
+    chrome.storage.local.set({
+      favoriteLookups: favorites.filter((entry) => lookupKey(entry) !== target),
+    });
+  });
+}
+
+function lookupKey(item) {
+  return [item.lang || 'en', (item.query || '').trim().toLowerCase()].join('::');
+}
+
+function langLabel(lang) {
+  return lang === 'ja' ? '日本語' : 'English';
 }

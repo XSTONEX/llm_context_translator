@@ -232,6 +232,86 @@
       white-space: nowrap;
       max-width: 100%;
     }
+
+    .popup-section {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid #e5e7eb;
+    }
+
+    .section-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #6b7280;
+      margin-bottom: 8px;
+    }
+
+    .lookup-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 120px;
+      overflow-y: auto;
+    }
+
+    .lookup-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 4px 8px;
+      align-items: center;
+      padding: 7px 8px;
+      background: #f6f7f9;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+    }
+
+    .lookup-main {
+      min-width: 0;
+    }
+
+    .lookup-query {
+      font-size: 12px;
+      font-weight: 600;
+      color: #1a1a1a;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .lookup-sub {
+      font-size: 11px;
+      color: #9ca3af;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      margin-top: 2px;
+    }
+
+    .lookup-actions {
+      display: flex;
+      gap: 4px;
+    }
+
+    .mini-btn {
+      border: 0;
+      background: #ffffff;
+      color: #6b7280;
+      border-radius: 5px;
+      font-size: 11px;
+      height: 24px;
+      padding: 0 7px;
+      cursor: pointer;
+    }
+
+    .mini-btn:hover {
+      color: #007AFF;
+    }
+
+    .empty-state {
+      color: #9ca3af;
+      font-size: 12px;
+      padding: 8px 0;
+    }
   </style>
 </head>
 <body>
@@ -255,6 +335,7 @@
       <div class="control-row">
         <span class="control-label">源语言</span>
         <select id="langSelect" class="model-select">
+          <option value="auto">自动识别</option>
           <option value="en">English</option>
           <option value="ja">日本語</option>
         </select>
@@ -282,6 +363,16 @@
       <div class="control-row model-row">
         <span class="model-info" id="modelInfo">当前模型: --</span>
       </div>
+    </div>
+
+    <div class="popup-section">
+      <div class="section-title">收藏词条</div>
+      <div class="lookup-list" id="favoritesList"></div>
+    </div>
+
+    <div class="popup-section">
+      <div class="section-title">最近查询</div>
+      <div class="lookup-list" id="historyList"></div>
     </div>
   </div>
 

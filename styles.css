@@ -164,6 +164,10 @@
   color: var(--lct-pin-active);
   background: rgba(59, 130, 246, 0.08);
 }
+.lct-icon-btn[data-action="favorite"].lct-active {
+  color: #F59E0B;
+  background: rgba(245, 158, 11, 0.1);
+}
 .lct-icon-btn.lct-copied {
   color: var(--lct-copied-color);
 }
@@ -214,6 +218,23 @@
   border-radius: 6px;
   padding: 4px 10px;
   margin: 0 16px 4px;
+}
+
+.lct-progressive-morphology {
+  padding: 8px var(--lct-padding) 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.lct-morphology-pill {
+  font-size: var(--lct-font-size-xs);
+  color: var(--lct-text-secondary);
+  background: var(--lct-bg-secondary);
+  border: 1px solid var(--lct-border);
+  border-radius: 999px;
+  padding: 2px 8px;
+  line-height: 1.5;
 }
 
 .lct-speaker {
@@ -553,6 +574,15 @@
   gap: 8px;
 }
 
+.lct-initial-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 22px var(--lct-padding);
+  color: var(--lct-text-secondary);
+  font-size: var(--lct-font-size-sm);
+}
+
 .lct-spinner {
   width: 16px;
   height: 16px;
@@ -766,6 +796,59 @@
   border-top: 1px solid var(--lct-border);
   text-align: right;
   user-select: none;
+}
+
+/* ========== Error 状态 ========== */
+.lct-error-card {
+  margin: var(--lct-padding);
+  padding: var(--lct-padding-sm);
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: var(--lct-radius-sm);
+}
+
+.lct-error-title {
+  font-size: var(--lct-font-size-md);
+  font-weight: 700;
+  color: #991B1B;
+  margin-bottom: 4px;
+}
+
+.lct-error-message {
+  font-size: var(--lct-font-size-sm);
+  color: #7F1D1D;
+  line-height: 1.6;
+}
+
+.lct-error-meta {
+  font-size: var(--lct-font-size-xs);
+  color: #B91C1C;
+  margin-top: 8px;
+  word-break: break-all;
+}
+
+.lct-error-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.lct-text-btn {
+  all: unset;
+  cursor: pointer;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--lct-radius-xs);
+  background: #DC2626;
+  color: #fff;
+  font-size: var(--lct-font-size-xs);
+  font-weight: 600;
+}
+
+.lct-text-btn-secondary {
+  background: #fff;
+  color: #991B1B;
+  border: 1px solid #FCA5A5;
 }
 
 /* ========== Toast 通知 ========== */

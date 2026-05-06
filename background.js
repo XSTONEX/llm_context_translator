@@ -46,6 +46,7 @@ chrome.runtime.onConnect.addListener((port) => {
       if (!response.ok) {
         port.postMessage({
           type: 'error',
+          requestId: msg.requestId,
           message: `API 请求失败: ${response.status}`
         });
         return;
@@ -73,6 +74,7 @@ chrome.runtime.onConnect.addListener((port) => {
 
           try {
             const payload = JSON.parse(trimmed.slice(6));
+            payload.requestId = msg.requestId;
             // 直接转发后端的结构化事件
             port.postMessage(payload);
 
@@ -89,6 +91,7 @@ chrome.runtime.onConnect.addListener((port) => {
       if (!streamEnded && buffer.trim() && buffer.trim().startsWith('data: ')) {
         try {
           const payload = JSON.parse(buffer.trim().slice(6));
+          payload.requestId = msg.requestId;
           port.postMessage(payload);
           if (payload.type === 'done' || payload.type === 'error') {
             streamEnded = true;
@@ -100,11 +103,11 @@ chrome.runtime.onConnect.addListener((port) => {
 
       // 兜底：如果后端异常中断，没发送 done 事件，确保通知前端
       if (!streamEnded) {
-        port.postMessage({ type: 'done', data: null });
+        port.postMessage({ type: 'done', requestId: msg.requestId, data: null });
       }
     } catch (err) {
       try {
-        port.postMessage({ type: 'error', message: err.message });
+        port.postMessage({ type: 'error', requestId: msg.requestId, message: err.message });
       } catch {
         // Port 可能已断开
       }

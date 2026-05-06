@@ -118,6 +118,35 @@ def parse_llm_response(content: str, selected_text: str, word_mode: bool) -> dic
     raise ValueError(f"无法解析 LLM 返回内容为 JSON: {content[:200]}")
 
 
+def build_chat_payload(
+    selected_text: str,
+    context_sentence: str,
+    model: Optional[str] = None,
+    lang: str = "en",
+    stream: bool = False,
+) -> dict:
+    """Build the shared chat-completions payload for streaming and non-streaming calls."""
+    strategy = get_strategy(lang)
+    word_mode = strategy.is_word_mode(selected_text)
+    system_prompt = strategy.get_word_prompt() if word_mode else strategy.get_sentence_prompt()
+    user_prompt = strategy.build_user_prompt(selected_text, context_sentence)
+    actual_model = resolve_model(model)
+
+    payload = {
+        "model": actual_model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        "temperature": 0.3,
+    }
+    if stream:
+        payload["stream"] = True
+    if model_supports_thinking(actual_model):
+        payload["enable_thinking"] = False
+    return payload
+
+
 # ========== 流式端点 ==========
 
 
@@ -131,26 +160,13 @@ async def stream_llm_response(
     """流式调用 LLM API，通过增量解析器输出结构化 SSE 事件"""
     strategy = get_strategy(lang)
     word_mode = strategy.is_word_mode(selected_text)
-    system_prompt = strategy.get_word_prompt() if word_mode else strategy.get_sentence_prompt()
-    user_prompt = strategy.build_user_prompt(selected_text, context_sentence)
-    actual_model = resolve_model(model)
+    payload = build_chat_payload(selected_text, context_sentence, model, lang, stream=True)
 
     url = f"{LLM_API_BASE_URL}/chat/completions"
     headers = {
         "Authorization": f"Bearer {SILICONFLOW_API_KEY}",
         "Content-Type": "application/json",
     }
-    payload = {
-        "model": actual_model,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        "stream": True,
-        "temperature": 0.3,
-    }
-    if model_supports_thinking(actual_model):
-        payload["enable_thinking"] = False
 
     parser = JsonStreamParser(simple_fields=strategy.get_schema_fields(word_mode))
 
@@ -198,7 +214,7 @@ async def stream_llm_response(
 
         full_data = strategy.ensure_response_fields(full_data, selected_text, word_mode)
         # 发射所有未发射的字段
-        remaining = parser._emit_remaining(full_data)
+        remaining = parser.emit_remaining(full_data)
         for event in remaining:
             yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
         yield f"data: {json.dumps({'type': 'done', 'data': full_data}, ensure_ascii=False)}\n\n"
@@ -232,25 +248,19 @@ async def translate(req: TranslateRequest):
     """非流式翻译端点（调试用）"""
     strategy = get_strategy(req.lang)
     word_mode = strategy.is_word_mode(req.selected_text)
-    system_prompt = strategy.get_word_prompt() if word_mode else strategy.get_sentence_prompt()
-    user_prompt = strategy.build_user_prompt(req.selected_text, req.context_sentence)
-    actual_model = resolve_model(req.model)
+    payload = build_chat_payload(
+        req.selected_text,
+        req.context_sentence,
+        req.model,
+        req.lang,
+        stream=False,
+    )
 
     url = f"{LLM_API_BASE_URL}/chat/completions"
     headers = {
         "Authorization": f"Bearer {SILICONFLOW_API_KEY}",
         "Content-Type": "application/json",
     }
-    payload = {
-        "model": actual_model,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        "temperature": 0.3,
-    }
-    if model_supports_thinking(actual_model):
-        payload["enable_thinking"] = False
 
     try:
         async with app.state.session.post(url, json=payload, headers=headers) as resp:
@@ -292,7 +302,7 @@ async def text_to_speech(req: TTSRequest):
         "Content-Type": "application/json",
     }
     payload = {
-        "model": "gpt-4o-mini-tts-2025-03-20",
+        "model": "gpt-4o-mini-tts",
         "input": req.text,
         "voice": req.voice,
     }

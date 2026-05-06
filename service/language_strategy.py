@@ -68,6 +68,7 @@ class EnglishStrategy(LanguageStrategy):
         data.setdefault("isWord", word_mode)
         if word_mode:
             data.setdefault("phonetic", "")
+            data.setdefault("morphology", [])
             data.setdefault("definitions", [])
         else:
             data.setdefault("translation", "")
