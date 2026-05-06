@@ -1,7 +1,9 @@
 import json
+from collections import deque
 import unittest
 
-from app import build_chat_payload
+from app import build_chat_payload, check_rate_limit, require_access_token
+from fastapi import HTTPException
 from json_stream_parser import JsonStreamParser
 from language_strategy import EnglishStrategy, JapaneseStrategy
 from models import DEFAULT_MODEL, resolve_model
@@ -102,6 +104,69 @@ class ModelAndPayloadTests(unittest.TestCase):
 
         encoded = json.dumps(payload, ensure_ascii=False)
         self.assertIn("单词/文本：watch", encoded)
+
+
+class AccessTokenTests(unittest.TestCase):
+    def test_access_token_not_required_when_unconfigured(self):
+        self.assertIsNone(require_access_token(None, configured_token=""))
+
+    def test_access_token_required_when_configured(self):
+        with self.assertRaises(HTTPException) as ctx:
+            require_access_token(None, configured_token="secret")
+
+        self.assertEqual(ctx.exception.status_code, 401)
+
+    def test_access_token_rejects_wrong_value(self):
+        with self.assertRaises(HTTPException) as ctx:
+            require_access_token("wrong", configured_token="secret")
+
+        self.assertEqual(ctx.exception.status_code, 401)
+
+    def test_access_token_accepts_matching_value(self):
+        self.assertIsNone(require_access_token("secret", configured_token="secret"))
+
+
+class RateLimitTests(unittest.TestCase):
+    def test_rate_limit_allows_requests_within_limit(self):
+        buckets = {"client": deque([1.0])}
+
+        self.assertIsNone(
+            check_rate_limit(
+                "client",
+                now=2.0,
+                limit=2,
+                window_seconds=60,
+                buckets=buckets,
+            )
+        )
+
+    def test_rate_limit_rejects_requests_over_limit(self):
+        buckets = {"client": deque([1.0, 2.0])}
+
+        with self.assertRaises(HTTPException) as ctx:
+            check_rate_limit(
+                "client",
+                now=3.0,
+                limit=2,
+                window_seconds=60,
+                buckets=buckets,
+            )
+
+        self.assertEqual(ctx.exception.status_code, 429)
+
+    def test_rate_limit_expires_old_requests(self):
+        buckets = {"client": deque([1.0, 2.0])}
+
+        self.assertIsNone(
+            check_rate_limit(
+                "client",
+                now=63.0,
+                limit=2,
+                window_seconds=60,
+                buckets=buckets,
+            )
+        )
+        self.assertEqual(list(buckets["client"]), [63.0])
 
 
 if __name__ == "__main__":

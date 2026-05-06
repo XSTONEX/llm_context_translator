@@ -1,15 +1,26 @@
 import json
 import re
+import secrets
+import time
+from collections import defaultdict, deque
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator, List, Optional
+from typing import AsyncGenerator, Deque, List, Optional
 
 import aiohttp
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
-from config import DEERAPI_BASE_URL, DEERAPI_KEY, SILICONFLOW_API_KEY, LLM_API_BASE_URL
+from config import (
+    DEERAPI_BASE_URL,
+    DEERAPI_KEY,
+    LCT_ACCESS_TOKEN,
+    LCT_RATE_LIMIT_REQUESTS,
+    LCT_RATE_LIMIT_WINDOW_SECONDS,
+    LLM_API_BASE_URL,
+    SILICONFLOW_API_KEY,
+)
 from json_stream_parser import JsonStreamParser
 from language_strategy import get_strategy
 from models import DEFAULT_MODEL, get_models_response, model_supports_thinking, resolve_model
@@ -95,6 +106,46 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+RATE_LIMIT_BUCKETS: dict[str, Deque[float]] = defaultdict(deque)
+
+
+def require_access_token(
+    x_lct_token: Optional[str] = Header(default=None),
+    configured_token: str = LCT_ACCESS_TOKEN,
+) -> None:
+    """Require a shared extension token when LCT_ACCESS_TOKEN is configured."""
+    if not configured_token:
+        return
+    if not x_lct_token or not secrets.compare_digest(x_lct_token, configured_token):
+        raise HTTPException(status_code=401, detail="Invalid access token")
+
+
+def check_rate_limit(
+    client_id: str,
+    now: Optional[float] = None,
+    limit: int = LCT_RATE_LIMIT_REQUESTS,
+    window_seconds: int = LCT_RATE_LIMIT_WINDOW_SECONDS,
+    buckets: Optional[dict[str, Deque[float]]] = None,
+) -> None:
+    """Apply a small in-memory per-client request limit."""
+    if limit <= 0 or window_seconds <= 0:
+        return
+    current_time = time.monotonic() if now is None else now
+    active_buckets = RATE_LIMIT_BUCKETS if buckets is None else buckets
+    bucket = active_buckets.setdefault(client_id, deque())
+    cutoff = current_time - window_seconds
+    while bucket and bucket[0] <= cutoff:
+        bucket.popleft()
+    if len(bucket) >= limit:
+        raise HTTPException(status_code=429, detail="Too many requests")
+    bucket.append(current_time)
+
+
+def require_rate_limit(request: Request) -> None:
+    client_id = request.client.host if request.client else "unknown"
+    check_rate_limit(client_id)
 
 # ========== LLM 响应解析 ==========
 
@@ -220,7 +271,10 @@ async def stream_llm_response(
         yield f"data: {json.dumps({'type': 'done', 'data': full_data}, ensure_ascii=False)}\n\n"
 
 
-@app.post("/translate/stream")
+@app.post(
+    "/translate/stream",
+    dependencies=[Depends(require_rate_limit), Depends(require_access_token)],
+)
 async def translate_stream(req: TranslateRequest):
     """流式翻译端点（SSE）"""
     return StreamingResponse(
@@ -243,7 +297,10 @@ async def translate_stream(req: TranslateRequest):
 # ========== 非流式端点（调试用） ==========
 
 
-@app.post("/translate")
+@app.post(
+    "/translate",
+    dependencies=[Depends(require_rate_limit), Depends(require_access_token)],
+)
 async def translate(req: TranslateRequest):
     """非流式翻译端点（调试用）"""
     strategy = get_strategy(req.lang)
@@ -290,7 +347,10 @@ async def translate(req: TranslateRequest):
 # ========== TTS 端点 ==========
 
 
-@app.post("/api/tts")
+@app.post(
+    "/api/tts",
+    dependencies=[Depends(require_rate_limit), Depends(require_access_token)],
+)
 async def text_to_speech(req: TTSRequest):
     """调用 DeerAPI 生成语音，返回 audio/mpeg 二进制流"""
     if not DEERAPI_KEY:

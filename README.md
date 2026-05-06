@@ -42,4 +42,9 @@ uv run uvicorn app:app --reload
 ```
 SILICONFLOW_API_KEY=your_api_key
 LLM_API_BASE_URL=https://api.siliconflow.cn/v1
+LCT_ACCESS_TOKEN=replace_me
+LCT_RATE_LIMIT_REQUESTS=60
+LCT_RATE_LIMIT_WINDOW_SECONDS=60
 ```
+
+如果后端部署在公网，务必设置 `LCT_ACCESS_TOKEN`，并把同一个值填到扩展根目录的 `config.js` 中。

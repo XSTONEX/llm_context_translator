@@ -15,6 +15,10 @@ async function getApiBase() {
   });
 }
 
+function getAuthHeaders() {
+  return LCT_ACCESS_TOKEN ? { 'X-LCT-Token': LCT_ACCESS_TOKEN } : {};
+}
+
 // ========== 流式通信（Port 长连接） ==========
 
 chrome.runtime.onConnect.addListener((port) => {
@@ -33,7 +37,10 @@ chrome.runtime.onConnect.addListener((port) => {
       const apiBase = await getApiBase();
       const response = await fetch(`${apiBase}/translate/stream`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders()
+        },
         body: JSON.stringify({
           selected_text: msg.text,
           context_sentence: msg.context || '',
@@ -159,7 +166,10 @@ async function fetchTranslation(text, context, model, lang) {
   const apiBase = await getApiBase();
   const response = await fetch(`${apiBase}/translate`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders()
+    },
     body: JSON.stringify({
       selected_text: text,
       context_sentence: context || '',

@@ -43,6 +43,10 @@
     return [voice || 'alloy', text].join('::');
   }
 
+  function getAuthHeaders() {
+    return LCT_ACCESS_TOKEN ? { 'X-LCT-Token': LCT_ACCESS_TOKEN } : {};
+  }
+
   async function fetchTTS(text, voice = 'alloy') {
     if (!text) return;
 
@@ -69,7 +73,10 @@
     try {
       const response = await fetch(`${apiBase}/api/tts`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders()
+        },
         body: JSON.stringify({ text, voice }),
         signal: controller.signal
       });
