@@ -149,7 +149,9 @@
     favoriteBtn.style.display = 'none';
     actions.appendChild(favoriteBtn);
     actions.appendChild(createIconButton('copy', ICONS.copy, '复制'));
-    actions.appendChild(createIconButton('pin', ICONS.pin, '固定'));
+    const pinBtn = createIconButton('pin', ICONS.pin, '固定');
+    pinBtn.classList.toggle('lct-active', state.isPinned);
+    actions.appendChild(pinBtn);
     actions.appendChild(createIconButton('close', ICONS.close, '关闭'));
     toolbar.appendChild(actions);
 
@@ -165,6 +167,7 @@
 
   function showProgressivePanel(selectionRect, request) {
     ensurePanel();
+    const keepPinnedPosition = state.isPinned && state.isVisible;
     panelElement.innerHTML = '';
 
     panelElement.appendChild(buildToolbar());
@@ -182,12 +185,17 @@
     appendResizeHandle();
 
     panelElement.style.display = 'block';
+    if (keepPinnedPosition) {
+      panelElement.style.opacity = '1';
+      panelElement.style.transform = 'scale(1) translateY(0)';
+      return;
+    }
+
     panelElement.style.opacity = '0';
     panelElement.style.transform = 'scale(0.96) translateY(-4px)';
     panelElement.style.width = constants.PANEL_WIDTH + 'px';
     panelElement.style.height = '';
     panelElement.style.maxHeight = '480px';
-
     requestAnimationFrame(() => {
       const pos = calculatePosition(selectionRect);
       panelElement.style.left = pos.left + 'px';
