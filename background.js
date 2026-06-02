@@ -19,6 +19,30 @@ function getAuthHeaders() {
   return LCT_ACCESS_TOKEN ? { 'X-LCT-Token': LCT_ACCESS_TOKEN } : {};
 }
 
+async function getEnabled() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(['enabled'], (result) => {
+      resolve(result.enabled !== undefined ? result.enabled : true);
+    });
+  });
+}
+
+async function setEnabled(enabled) {
+  return new Promise((resolve) => {
+    chrome.storage.local.set({ enabled }, () => resolve());
+  });
+}
+
+async function toggleEnabledFromCommand() {
+  const enabled = !(await getEnabled());
+  await applyEnabled(enabled);
+}
+
+chrome.commands.onCommand.addListener((command) => {
+  if (command !== 'toggle-enabled') return;
+  toggleEnabledFromCommand();
+});
+
 // ========== 流式通信（Port 长连接） ==========
 
 chrome.runtime.onConnect.addListener((port) => {
@@ -138,11 +162,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === 'TOGGLE_ENABLED') {
-    broadcastToggle(message.enabled);
+    applyEnabled(message.enabled);
     sendResponse({ success: true });
     return false;
   }
 });
+
+async function applyEnabled(enabled) {
+  await setEnabled(enabled);
+  await broadcastToggle(enabled);
+}
 
 async function broadcastToggle(enabled) {
   try {

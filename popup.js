@@ -17,6 +17,8 @@ function init() {
     apiBaseInput: document.getElementById('apiBaseInput'),
     modelInfo: document.getElementById('modelInfo'),
     modelSelect: document.getElementById('modelSelect'),
+    shortcutKey: document.getElementById('shortcutKey'),
+    shortcutCustomizeButton: document.getElementById('shortcutCustomizeButton'),
     favoritesList: document.getElementById('favoritesList'),
     historyList: document.getElementById('historyList'),
   };
@@ -41,6 +43,7 @@ function init() {
 
       checkStatus(apiBase, els.statusDot, els.modelInfo);
       loadModels(apiBase, els.modelSelect, els.modelInfo, savedModel);
+      loadShortcut(els.shortcutKey);
       renderLookupList(els.historyList, result.lookupHistory || [], { removable: false });
       renderLookupList(els.favoritesList, result.favoriteLookups || [], { removable: true });
     },
@@ -57,6 +60,10 @@ function init() {
     const enabled = els.enableToggle.checked;
     chrome.storage.local.set({ enabled });
     chrome.runtime.sendMessage({ type: 'TOGGLE_ENABLED', enabled }).catch(() => {});
+  });
+
+  els.shortcutCustomizeButton.addEventListener('click', () => {
+    chrome.tabs.create({ url: 'chrome://extensions/shortcuts' });
   });
 
   els.apiBaseInput.addEventListener('blur', () => {
@@ -89,6 +96,22 @@ function init() {
     if (changes.favoriteLookups) {
       renderLookupList(els.favoritesList, changes.favoriteLookups.newValue || [], { removable: true });
     }
+    if (changes.enabled) {
+      els.enableToggle.checked = changes.enabled.newValue !== undefined ? changes.enabled.newValue : true;
+    }
+  });
+}
+
+function loadShortcut(shortcutKeyEl) {
+  if (!chrome.commands || !chrome.commands.getAll) {
+    shortcutKeyEl.textContent = '未设置';
+    return;
+  }
+
+  chrome.commands.getAll((commands) => {
+    const command = commands.find((item) => item.name === 'toggle-enabled');
+    shortcutKeyEl.textContent = command && command.shortcut ? command.shortcut : '未设置';
+    shortcutKeyEl.title = shortcutKeyEl.textContent;
   });
 }
 

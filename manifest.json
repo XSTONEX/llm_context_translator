@@ -27,6 +27,16 @@
     "service_worker": "background.js"
   },
 
+  "commands": {
+    "toggle-enabled": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Y",
+        "mac": "Command+Shift+Y"
+      },
+      "description": "开启/关闭划词翻译"
+    }
+  },
+
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
