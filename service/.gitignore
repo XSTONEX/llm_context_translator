@@ -11,3 +11,7 @@ wheels/
 
 # Environment variables
 .env
+
+# 生词本 SQLite 数据库
+data/
+*.db

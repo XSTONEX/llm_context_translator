@@ -689,7 +689,7 @@
     return card;
   }
 
-  function showTimingBar(elapsed, modelId, lang) {
+  function showTimingBar(elapsed, modelId, lang, fromCache) {
     if (!panelElement) return;
     const statusBar = panelElement.querySelector('.lct-status-bar');
     if (!statusBar) return;
@@ -698,7 +698,8 @@
       const models = result.modelList || [];
       const model = models.find((m) => m.id === modelId);
       const displayName = model ? model.name : (modelId || 'Default');
-      statusBar.textContent = '\u23F1 ' + elapsed + 's · ' + LCT.lang.label(lang) + ' · ' + displayName;
+      const prefix = fromCache ? '\u26A1 缓存' : '\u23F1 ' + elapsed + 's';
+      statusBar.textContent = prefix + ' · ' + LCT.lang.label(lang) + ' · ' + displayName;
       statusBar.style.display = 'block';
       statusBar.classList.add('lct-fade-in');
     });
@@ -1209,8 +1210,8 @@
   async function handleFavorite(btn) {
     const data = state.currentResponseData;
     const request = state.currentRequest;
-    if (!data || !data.isWord || !request) {
-      showToast('仅单词模式可收藏');
+    if (!data || !data.query || !request) {
+      showToast('暂无可收藏内容');
       return;
     }
     const isFavorite = await LCT.storage.toggleFavorite(data, request);
@@ -1221,8 +1222,8 @@
   async function syncFavoriteButton(data, request) {
     const btn = panelElement && panelElement.querySelector('[data-action="favorite"]');
     if (!btn) return;
-    btn.style.display = data && data.isWord ? '' : 'none';
-    if (!data || !data.isWord) return;
+    btn.style.display = data && data.query ? '' : 'none';
+    if (!data || !data.query) return;
     const isFavorite = await LCT.storage.isFavorite(data.query, request.lang);
     btn.classList.toggle('lct-active', isFavorite);
   }

@@ -246,6 +246,22 @@
       margin-bottom: 8px;
     }
 
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .section-header .section-title {
+      margin-bottom: 0;
+    }
+
+    .section-actions {
+      display: flex;
+      gap: 4px;
+    }
+
     .lookup-list {
       display: flex;
       flex-direction: column;
@@ -402,7 +418,13 @@
     </div>
 
     <div class="popup-section">
-      <div class="section-title">收藏词条</div>
+      <div class="section-header">
+        <div class="section-title">收藏词条</div>
+        <div class="section-actions">
+          <button type="button" class="mini-btn" id="reviewButton">复习</button>
+          <button type="button" class="mini-btn" id="exportButton">导出</button>
+        </div>
+      </div>
       <div class="lookup-list" id="favoritesList"></div>
     </div>
 
@@ -413,6 +435,7 @@
   </div>
 
   <script src="config.js"></script>
+  <script src="favorites-api.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

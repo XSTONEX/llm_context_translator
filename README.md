@@ -32,19 +32,36 @@ uv run uvicorn app:app --reload
 
 ### 浏览器扩展
 
-1. 打开 `chrome://extensions/`，启用开发者模式
-2. 点击「加载已解压的扩展程序」，选择项目根目录
+1. 复制配置模板：`cp config.example.js config.js`，填入访问令牌（见下）
+2. 打开 `chrome://extensions/`，启用开发者模式
+3. 点击「加载已解压的扩展程序」，选择项目根目录
 
 ## 配置
 
-在 `service/.env` 中设置：
+后端配置见 `service/.env`（参考 `service/.env.example`）：
 
 ```
 SILICONFLOW_API_KEY=your_api_key
 LLM_API_BASE_URL=https://api.siliconflow.cn/v1
-LCT_ACCESS_TOKEN=replace_me
+DEERAPI_KEY=your_tts_key          # 可选，TTS 发音
+LCT_ACCESS_TOKEN=replace_me       # 公网部署必填
 LCT_RATE_LIMIT_REQUESTS=60
 LCT_RATE_LIMIT_WINDOW_SECONDS=60
 ```
 
-如果后端部署在公网，务必设置 `LCT_ACCESS_TOKEN`，并把同一个值填到扩展根目录的 `config.js` 中。
+### 访问鉴权（重要）
+
+后端的付费接口（`/translate`、`/api/tts`）由 `LCT_ACCESS_TOKEN` 保护。
+
+- **`LCT_ACCESS_TOKEN` 为空 = 后端不鉴权**，任何知道你域名的人都能消耗你的 API Key。公网部署务必设置。
+- 扩展侧的 `config.js`（已被 `.gitignore` 忽略，仅本地）中的 `LCT_ACCESS_TOKEN` 必须与后端 `.env` 中的值**完全一致**。
+- 生成随机令牌：`python3 -c "import secrets; print(secrets.token_urlsafe(32))"`
+- 修改后端 `.env` 后需**重启后端服务**才能生效。
+
+## 生词本同步
+
+收藏（生词本）存储在后端 SQLite（默认 `service/data/favorites.db`，可用 `LCT_DB_PATH` 改路径），
+扩展侧保留一份本地镜像以保证响应速度和离线可读。换设备/重装扩展后，生词本会自动从后端同步回来。
+
+> 多用户预留：数据表已带 `user_id` 列（当前恒为 `default`）。未来要按用户隔离，只需修改
+> `service/app.py` 中的 `resolve_user_id()`（把 token 映射到不同用户），API 与表结构无需改动。

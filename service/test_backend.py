@@ -1,8 +1,11 @@
 import json
+import os
+import tempfile
 from collections import deque
 import unittest
 
-from app import build_chat_payload, check_rate_limit, require_access_token
+import storage
+from app import build_chat_payload, check_rate_limit, require_access_token, resolve_user_id
 from fastapi import HTTPException
 from json_stream_parser import JsonStreamParser
 from language_strategy import EnglishStrategy, JapaneseStrategy
@@ -167,6 +170,58 @@ class RateLimitTests(unittest.TestCase):
             )
         )
         self.assertEqual(list(buckets["client"]), [63.0])
+
+
+class FavoritesStorageTests(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+        tmp.close()
+        self.db_path = tmp.name
+        self._orig_path = storage.LCT_DB_PATH
+        storage.LCT_DB_PATH = self.db_path
+        storage.init_db()
+
+    def tearDown(self):
+        storage.LCT_DB_PATH = self._orig_path
+        os.unlink(self.db_path)
+
+    def test_upsert_dedups_case_insensitively_and_orders_newest_first(self):
+        storage.upsert_favorite("default", {"query": "Watch", "lang": "en", "timestamp": 1})
+        storage.upsert_favorite(
+            "default", {"query": "watch", "lang": "en", "coreTranslation": "看", "timestamp": 2}
+        )
+        storage.upsert_favorite("default", {"query": "これ", "lang": "ja", "timestamp": 3})
+
+        favs = storage.list_favorites("default")
+        self.assertEqual(len(favs), 2)  # Watch/watch 折叠为一条
+        self.assertEqual([f["query"] for f in favs], ["これ", "watch"])  # 倒序
+        en = next(f for f in favs if f["lang"] == "en")
+        self.assertEqual(en["coreTranslation"], "看")  # payload 被更新
+
+    def test_delete_is_case_insensitive(self):
+        storage.upsert_favorite("default", {"query": "Apple", "lang": "en"})
+        storage.delete_favorite("default", "en", "APPLE")
+        self.assertEqual(storage.list_favorites("default"), [])
+
+    def test_bulk_import_skips_blank_queries(self):
+        imported = storage.bulk_import(
+            "default", [{"query": "a", "lang": "en"}, {"query": "  ", "lang": "en"}]
+        )
+        self.assertEqual(imported, 1)
+        self.assertEqual(len(storage.list_favorites("default")), 1)
+
+    def test_users_are_isolated(self):
+        storage.upsert_favorite("default", {"query": "a", "lang": "en"})
+        storage.upsert_favorite("alice", {"query": "b", "lang": "en"})
+        self.assertEqual(len(storage.list_favorites("default")), 1)
+        self.assertEqual(len(storage.list_favorites("alice")), 1)
+
+
+class UserResolutionTests(unittest.TestCase):
+    def test_resolve_user_id_is_single_user_for_now(self):
+        # 多用户预留：当前任何 token 都归到 default 用户
+        self.assertEqual(resolve_user_id(None), "default")
+        self.assertEqual(resolve_user_id("any-token"), "default")
 
 
 if __name__ == "__main__":

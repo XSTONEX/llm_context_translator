@@ -42,6 +42,7 @@
       "matches": ["<all_urls>"],
       "js": [
         "config.js",
+        "favorites-api.js",
         "content-core.js",
         "content-tts.js",
         "content-client.js",

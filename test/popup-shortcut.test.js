@@ -53,7 +53,9 @@ function loadPopup() {
     shortcutKey: createElement('shortcutKey'),
     shortcutCustomizeButton: createElement('shortcutCustomizeButton'),
     favoritesList: createElement('favoritesList'),
-    historyList: createElement('historyList')
+    historyList: createElement('historyList'),
+    reviewButton: createElement('reviewButton'),
+    exportButton: createElement('exportButton')
   };
   const storageChangeListeners = [];
   const createdTabs = [];
@@ -95,6 +97,9 @@ function loadPopup() {
       runtime: {
         sendMessage() {
           return { catch() {} };
+        },
+        getURL(path) {
+          return 'chrome-extension://test/' + path;
         }
       },
       tabs: {
@@ -141,6 +146,10 @@ assert.equal(harness.elements.shortcutKey.title, 'Command+Shift+Y');
 harness.elements.shortcutCustomizeButton.dispatch('click');
 assert.equal(harness.createdTabs.length, 1);
 assert.equal(harness.createdTabs[0].url, 'chrome://extensions/shortcuts');
+
+harness.elements.reviewButton.dispatch('click');
+assert.equal(harness.createdTabs.length, 2);
+assert.equal(harness.createdTabs[1].url, 'chrome-extension://test/review.html');
 
 harness.storageChangeListeners[0](
   {

@@ -15,3 +15,8 @@ WORD_COUNT_THRESHOLD: int = int(os.getenv("WORD_COUNT_THRESHOLD", "3"))
 
 DEERAPI_KEY: str = os.getenv("DEERAPI_KEY", "")
 DEERAPI_BASE_URL: str = os.getenv("DEERAPI_BASE_URL", "https://api.deerapi.com/v1")
+
+# 生词本 SQLite 数据库路径（默认放在 service/data/ 下，已被 .gitignore 忽略）
+LCT_DB_PATH: str = os.getenv(
+    "LCT_DB_PATH", str(Path(__file__).parent / "data" / "favorites.db")
+)

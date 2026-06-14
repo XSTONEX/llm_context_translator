@@ -14,7 +14,8 @@
     PANEL_GAP: 10,
     DEBOUNCE_DELAY: 300,
     HISTORY_LIMIT: 50,
-    TTS_CACHE_LIMIT: 20
+    TTS_CACHE_LIMIT: 20,
+    LOOKUP_CACHE_LIMIT: 200
   };
 
   root.state = {
@@ -105,6 +106,25 @@
     return [item.lang || 'en', (item.query || '').trim().toLowerCase()].join('::');
   }
 
+  // djb2 字符串哈希，用于把上下文压成短键
+  function hashString(str) {
+    let hash = 5381;
+    for (let i = 0; i < str.length; i++) {
+      hash = ((hash << 5) + hash + str.charCodeAt(i)) | 0;
+    }
+    return (hash >>> 0).toString(36);
+  }
+
+  // 缓存键：语言 + 模型 + 选中文本 + 上下文哈希（上下文影响语境解析，必须纳入键）
+  function getCacheKey(request) {
+    return [
+      request.lang || 'en',
+      request.model || 'default',
+      (request.text || '').trim().toLowerCase(),
+      hashString(request.context || '')
+    ].join('::');
+  }
+
   root.storage = {
     get: getStorage,
     set: setStorage,
@@ -145,6 +165,31 @@
       await setStorage({ lookupHistory: next });
     },
 
+    async getCachedLookup(request) {
+      const result = await getStorage(['lookupCache']);
+      const cache = (result.lookupCache && typeof result.lookupCache === 'object')
+        ? result.lookupCache : {};
+      const entry = cache[getCacheKey(request)];
+      return entry && entry.data ? entry.data : null;
+    },
+
+    async setCachedLookup(request, data) {
+      if (!data || !data.query) return;
+      const result = await getStorage(['lookupCache']);
+      const cache = (result.lookupCache && typeof result.lookupCache === 'object')
+        ? result.lookupCache : {};
+      cache[getCacheKey(request)] = { data, ts: Date.now() };
+
+      // 超出上限时按时间戳淘汰最旧的条目（LRU）
+      const keys = Object.keys(cache);
+      const overflow = keys.length - root.constants.LOOKUP_CACHE_LIMIT;
+      if (overflow > 0) {
+        keys.sort((a, b) => (cache[a].ts || 0) - (cache[b].ts || 0));
+        for (let i = 0; i < overflow; i++) delete cache[keys[i]];
+      }
+      await setStorage({ lookupCache: cache });
+    },
+
     async isFavorite(query, lang) {
       const result = await getStorage(['favoriteLookups']);
       const favorites = Array.isArray(result.favoriteLookups) ? result.favoriteLookups : [];
@@ -152,18 +197,21 @@
     },
 
     async toggleFavorite(data, request) {
-      if (!data || !data.isWord || !data.query) return false;
+      if (!data || !data.query) return false;
       const result = await getStorage(['favoriteLookups']);
       const favorites = Array.isArray(result.favoriteLookups) ? result.favoriteLookups : [];
       const item = {
         id: String(Date.now()),
         query: data.query,
         lang: request.lang,
+        isWord: Boolean(data.isWord),
         phonetic: data.phonetic || data.kana || data.romaji || '',
         coreTranslation:
           (data.contextAnalysis && data.contextAnalysis.coreTranslation) ||
+          data.translation ||
           (data.definitions && data.definitions[0] && data.definitions[0].meaning) ||
           '',
+        translation: data.translation || '',
         definitions: data.definitions || [],
         timestamp: Date.now()
       };
@@ -172,7 +220,17 @@
       const next = exists
         ? favorites.filter((entry) => getLookupKey(entry) !== key)
         : [item, ...favorites];
+      // 先乐观更新本地镜像（面板即时响应、离线可用）
       await setStorage({ favoriteLookups: next });
+      // 再尽力推送到后端（失败不影响本地，下次同步以后端为准）
+      if (globalThis.LCTFavorites) {
+        try {
+          if (exists) await globalThis.LCTFavorites.remove(request.lang, data.query);
+          else await globalThis.LCTFavorites.add(item);
+        } catch (err) {
+          console.warn('[LCT] favorite backend sync failed:', err && err.message);
+        }
+      }
       return !exists;
     }
   };

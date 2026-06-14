@@ -21,11 +21,17 @@ from config import (
     LLM_API_BASE_URL,
     SILICONFLOW_API_KEY,
 )
+import storage
 from json_stream_parser import JsonStreamParser
 from language_strategy import get_strategy
 from models import DEFAULT_MODEL, get_models_response, model_supports_thinking, resolve_model
 
 # ========== Pydantic 数据模型 ==========
+
+
+# 输入长度上限：防止误选超长文本触发高额付费调用（即使持有 token 也兜底）
+MAX_TTS_CHARS = 600
+MAX_TRANSLATE_CHARS = 4000
 
 
 class TTSRequest(BaseModel):
@@ -38,6 +44,31 @@ class TranslateRequest(BaseModel):
     context_sentence: str = ""
     model: Optional[str] = None
     lang: str = "en"
+
+
+class FavoriteItem(BaseModel):
+    """生词本条目：保留前端的完整收藏对象（允许额外字段，向前兼容）。"""
+
+    query: str
+    lang: str = "en"
+    isWord: bool = False
+    phonetic: str = ""
+    coreTranslation: str = ""
+    translation: str = ""
+    definitions: list = []
+    timestamp: Optional[float] = None
+    id: Optional[str] = None
+
+    model_config = {"extra": "allow"}
+
+
+class FavoriteDeleteRequest(BaseModel):
+    lang: str = "en"
+    query: str
+
+
+class FavoriteBulkRequest(BaseModel):
+    favorites: List[FavoriteItem] = []
 
 
 class ExampleItem(BaseModel):
@@ -90,6 +121,7 @@ class TranslateResponse(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    storage.init_db()
     app.state.session = aiohttp.ClientSession()
     yield
     await app.state.session.close()
@@ -146,6 +178,19 @@ def check_rate_limit(
 def require_rate_limit(request: Request) -> None:
     client_id = request.client.host if request.client else "unknown"
     check_rate_limit(client_id)
+
+
+def resolve_user_id(token: Optional[str]) -> str:
+    """把访问令牌解析为用户 ID（多用户预留的唯一收口点）。
+
+    当前为个人单用户，恒定返回 'default'。未来要分用户，只需在这里
+    建立 token -> user_id 的映射，其余 API / 表结构均无需改动。
+    """
+    return "default"
+
+
+def current_user(x_lct_token: Optional[str] = Header(default=None)) -> str:
+    return resolve_user_id(x_lct_token)
 
 # ========== LLM 响应解析 ==========
 
@@ -277,6 +322,10 @@ async def stream_llm_response(
 )
 async def translate_stream(req: TranslateRequest):
     """流式翻译端点（SSE）"""
+    if len(req.selected_text) > MAX_TRANSLATE_CHARS:
+        raise HTTPException(
+            status_code=413, detail=f"选中文本过长（上限 {MAX_TRANSLATE_CHARS} 字符）"
+        )
     return StreamingResponse(
         stream_llm_response(
             app.state.session,
@@ -303,6 +352,10 @@ async def translate_stream(req: TranslateRequest):
 )
 async def translate(req: TranslateRequest):
     """非流式翻译端点（调试用）"""
+    if len(req.selected_text) > MAX_TRANSLATE_CHARS:
+        raise HTTPException(
+            status_code=413, detail=f"选中文本过长（上限 {MAX_TRANSLATE_CHARS} 字符）"
+        )
     strategy = get_strategy(req.lang)
     word_mode = strategy.is_word_mode(req.selected_text)
     payload = build_chat_payload(
@@ -355,6 +408,10 @@ async def text_to_speech(req: TTSRequest):
     """调用 DeerAPI 生成语音，返回 audio/mpeg 二进制流"""
     if not DEERAPI_KEY:
         raise HTTPException(status_code=500, detail="DEERAPI_KEY 未配置")
+    if len(req.text) > MAX_TTS_CHARS:
+        raise HTTPException(
+            status_code=413, detail=f"TTS 文本过长（上限 {MAX_TTS_CHARS} 字符）"
+        )
 
     url = f"{DEERAPI_BASE_URL}/audio/speech"
     headers = {
@@ -395,6 +452,48 @@ async def get_available_models():
         "models": get_models_response(),
         "default": DEFAULT_MODEL["id"],
     }
+
+
+# ========== 生词本（收藏）端点 ==========
+
+
+@app.get(
+    "/api/favorites",
+    dependencies=[Depends(require_rate_limit), Depends(require_access_token)],
+)
+def get_favorites(user_id: str = Depends(current_user)):
+    """返回当前用户的生词本（按收藏时间倒序）。"""
+    return {"favorites": storage.list_favorites(user_id)}
+
+
+@app.post(
+    "/api/favorites",
+    dependencies=[Depends(require_rate_limit), Depends(require_access_token)],
+)
+def add_favorite(item: FavoriteItem, user_id: str = Depends(current_user)):
+    """新增/更新一条生词。"""
+    storage.upsert_favorite(user_id, item.model_dump())
+    return {"ok": True}
+
+
+@app.post(
+    "/api/favorites/delete",
+    dependencies=[Depends(require_rate_limit), Depends(require_access_token)],
+)
+def remove_favorite(req: FavoriteDeleteRequest, user_id: str = Depends(current_user)):
+    """删除一条生词（用 POST 而非 DELETE，便于在请求体携带长句子）。"""
+    storage.delete_favorite(user_id, req.lang, req.query)
+    return {"ok": True}
+
+
+@app.post(
+    "/api/favorites/bulk",
+    dependencies=[Depends(require_rate_limit), Depends(require_access_token)],
+)
+def import_favorites(req: FavoriteBulkRequest, user_id: str = Depends(current_user)):
+    """批量导入（客户端首次同步时把本地已有收藏迁移上来）。"""
+    count = storage.bulk_import(user_id, [item.model_dump() for item in req.favorites])
+    return {"ok": True, "imported": count}
 
 
 # ========== 状态检测端点 ==========

@@ -63,7 +63,33 @@
     state.currentRequest = request;
     state.currentResponseData = null;
 
+    // 缓存命中：直接渲染，不调用 LLM（重试按钮可强制刷新）
+    const cached = await LCT.storage.getCachedLookup(request);
+    if (cached) {
+      serveFromCache(request, cached);
+      return;
+    }
+
     await runRequest(request);
+  }
+
+  function triggerTTS(request, data) {
+    if (request.lang !== 'ja') {
+      LCT.tts.fetchTTS(request.text);
+      return;
+    }
+    const ttsText = (data && (data.kana || data.query)) || request.text;
+    LCT.tts.fetchTTS(ttsText);
+  }
+
+  function serveFromCache(request, data) {
+    if (!LCT.client.isCurrent(request.id)) return;
+    triggerTTS(request, data);
+    LCT.panel.showProgressivePanel(request.rect, request);
+    LCT.panel.finalizeStreamingPanel(data, { lang: request.lang }, request);
+    LCT.panel.showTimingBar(null, request.model, request.lang, true);
+    LCT.panel.repositionPanel(request.rect);
+    LCT.storage.addHistory(data, request);
   }
 
   async function retryCurrentRequest() {
@@ -147,7 +173,10 @@
             LCT.panel.finalizeStreamingPanel(msg.data, receivedData, request);
             LCT.panel.showTimingBar(elapsed, request.model, request.lang);
             LCT.panel.repositionPanel(request.rect);
-            if (msg.data) await LCT.storage.addHistory(msg.data, request);
+            if (msg.data) {
+              await LCT.storage.addHistory(msg.data, request);
+              await LCT.storage.setCachedLookup(request, msg.data);
+            }
             LCT.client.disconnectActivePort();
             break;
           }

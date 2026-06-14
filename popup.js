@@ -21,10 +21,17 @@ function init() {
     shortcutCustomizeButton: document.getElementById('shortcutCustomizeButton'),
     favoritesList: document.getElementById('favoritesList'),
     historyList: document.getElementById('historyList'),
+    reviewButton: document.getElementById('reviewButton'),
+    exportButton: document.getElementById('exportButton'),
   };
 
   const toggleSwitch = els.enableToggle.closest('.toggle-switch');
   toggleSwitch.classList.add('no-transition');
+
+  // 打开 popup 时强制从后端同步生词本；同步写入镜像后由 onChanged 监听重新渲染
+  if (typeof LCTFavorites !== 'undefined') {
+    LCTFavorites.sync({ force: true });
+  }
 
   chrome.storage.local.get(
     ['enabled', 'apiBase', 'selectedModel', 'sourceLangMode', 'targetLang', 'lookupHistory', 'favoriteLookups'],
@@ -64,6 +71,23 @@ function init() {
 
   els.shortcutCustomizeButton.addEventListener('click', () => {
     chrome.tabs.create({ url: 'chrome://extensions/shortcuts' });
+  });
+
+  els.reviewButton.addEventListener('click', () => {
+    chrome.tabs.create({ url: chrome.runtime.getURL('review.html') });
+  });
+
+  els.exportButton.addEventListener('click', () => {
+    chrome.storage.local.get(['favoriteLookups'], (result) => {
+      const favorites = Array.isArray(result.favoriteLookups) ? result.favoriteLookups : [];
+      if (favorites.length === 0) {
+        flashButton(els.exportButton, '暂无收藏');
+        return;
+      }
+      const csv = buildFavoritesCsv(favorites);
+      const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      downloadText(csv, `生词本_${stamp}.csv`, 'text/csv;charset=utf-8');
+    });
   });
 
   els.apiBaseInput.addEventListener('blur', () => {
@@ -285,4 +309,45 @@ function lookupKey(item) {
 
 function langLabel(lang) {
   return lang === 'ja' ? '日本語' : 'English';
+}
+
+// 把收藏导出为 CSV：正面=词条，背面=读音+释义，可直接导入 Anki / Excel
+function buildFavoritesCsv(items) {
+  const esc = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  const rows = [['正面', '背面', '语言']];
+  items.forEach((item) => {
+    const front = item.query || '';
+    const reading = item.phonetic ? '[' + item.phonetic + '] ' : '';
+    const defs = (item.definitions || [])
+      .map((d) => (d.partOfSpeech ? d.partOfSpeech + ' ' : '') + (d.meaning || ''))
+      .filter(Boolean)
+      .join('；');
+    const core = item.coreTranslation || item.translation || '';
+    const back = (reading + core).trim() + (defs ? '\n' + defs : '');
+    rows.push([front, back, langLabel(item.lang)]);
+  });
+  return rows.map((r) => r.map(esc).join(',')).join('\n');
+}
+
+function downloadText(text, filename, mime) {
+  // 加 UTF-8 BOM，保证 Excel 正确识别中文
+  const blob = new Blob(['﻿' + text], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function flashButton(btn, message) {
+  const original = btn.textContent;
+  btn.textContent = message;
+  btn.disabled = true;
+  setTimeout(() => {
+    btn.textContent = original;
+    btn.disabled = false;
+  }, 1200);
 }
