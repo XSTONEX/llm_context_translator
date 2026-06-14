@@ -48,6 +48,7 @@ function loadPopup() {
     enableToggle: createElement('enableToggle'),
     langSelect: createElement('langSelect'),
     apiBaseInput: createElement('apiBaseInput'),
+    tokenInput: createElement('tokenInput'),
     modelInfo: createElement('modelInfo'),
     modelSelect: createElement('modelSelect'),
     shortcutKey: createElement('shortcutKey'),
@@ -92,6 +93,12 @@ function loadPopup() {
           addListener(listener) {
             storageChangeListeners.push(listener);
           }
+        },
+        sync: {
+          get(keys, callback) {
+            callback({});
+          },
+          set() {}
         }
       },
       runtime: {

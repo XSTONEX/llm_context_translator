@@ -1,6 +1,6 @@
 // ========================================================================
 // favorites-api.js — 生词本后端同步客户端（内容脚本 / popup / 复习页共用）
-// 依赖 config.js 暴露的 DEFAULT_API_BASE、LCT_ACCESS_TOKEN 全局变量。
+// 依赖 config.js 暴露的 DEFAULT_API_BASE 与 getAccessToken()。
 // 策略：后端为权威源，chrome.storage.local 的 favoriteLookups 作为本地镜像，
 //      保证离线可读、面板响应快；增删走「乐观更新本地 + 异步推后端」。
 // ========================================================================
@@ -22,9 +22,10 @@
     });
   }
 
-  function authHeaders() {
+  async function authHeaders() {
     const headers = { 'Content-Type': 'application/json' };
-    if (global.LCT_ACCESS_TOKEN) headers['X-LCT-Token'] = global.LCT_ACCESS_TOKEN;
+    const token = (typeof getAccessToken === 'function') ? await getAccessToken() : '';
+    if (token) headers['X-LCT-Token'] = token;
     return headers;
   }
 
@@ -32,7 +33,7 @@
     const apiBase = await getApiBase();
     const res = await fetch(apiBase + path, {
       method,
-      headers: authHeaders(),
+      headers: await authHeaders(),
       body: body ? JSON.stringify(body) : undefined
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);

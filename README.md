@@ -32,9 +32,9 @@ uv run uvicorn app:app --reload
 
 ### 浏览器扩展
 
-1. 复制配置模板：`cp config.example.js config.js`，填入访问令牌（见下）
-2. 打开 `chrome://extensions/`，启用开发者模式
-3. 点击「加载已解压的扩展程序」，选择项目根目录
+1. 打开 `chrome://extensions/`，启用开发者模式
+2. 点击「加载已解压的扩展程序」，选择项目根目录
+3. 点击扩展图标打开 popup，在「访问令牌」里填入与后端一致的 token（见下）
 
 ## 配置
 
@@ -51,10 +51,11 @@ LCT_RATE_LIMIT_WINDOW_SECONDS=60
 
 ### 访问鉴权（重要）
 
-后端的付费接口（`/translate`、`/api/tts`）由 `LCT_ACCESS_TOKEN` 保护。
+后端的付费接口（`/translate`、`/api/tts`、`/api/favorites`）由 `LCT_ACCESS_TOKEN` 保护。
 
 - **`LCT_ACCESS_TOKEN` 为空 = 后端不鉴权**，任何知道你域名的人都能消耗你的 API Key。公网部署务必设置。
-- 扩展侧的 `config.js`（已被 `.gitignore` 忽略，仅本地）中的 `LCT_ACCESS_TOKEN` 必须与后端 `.env` 中的值**完全一致**。
+- 扩展侧的 token 在 **popup 的「访问令牌」** 里填写，保存到 `chrome.storage.sync`，会随 Chrome 账号自动同步到所有设备（无需在每台电脑手动配置）。它必须与后端 `.env` 中的 `LCT_ACCESS_TOKEN` **完全一致**。
+- `config.js` 只保存后端地址，不含任何密钥，因此可以安全地提交进公开仓库。
 - 生成随机令牌：`python3 -c "import secrets; print(secrets.token_urlsafe(32))"`
 - 修改后端 `.env` 后需**重启后端服务**才能生效。
 

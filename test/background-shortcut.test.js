@@ -68,7 +68,7 @@ function loadBackground(initialStorage) {
     console,
     chrome: harness.chrome,
     DEFAULT_API_BASE: 'https://hover.sqw.org.cn',
-    LCT_ACCESS_TOKEN: '',
+    getAccessToken: () => Promise.resolve(''),
     importScripts() {},
     fetch,
     TextDecoder,

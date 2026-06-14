@@ -15,8 +15,9 @@ async function getApiBase() {
   });
 }
 
-function getAuthHeaders() {
-  return LCT_ACCESS_TOKEN ? { 'X-LCT-Token': LCT_ACCESS_TOKEN } : {};
+async function getAuthHeaders() {
+  const token = await getAccessToken();
+  return token ? { 'X-LCT-Token': token } : {};
 }
 
 async function getEnabled() {
@@ -63,7 +64,7 @@ chrome.runtime.onConnect.addListener((port) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...getAuthHeaders()
+          ...(await getAuthHeaders())
         },
         body: JSON.stringify({
           selected_text: msg.text,
@@ -197,7 +198,7 @@ async function fetchTranslation(text, context, model, lang) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...getAuthHeaders()
+      ...(await getAuthHeaders())
     },
     body: JSON.stringify({
       selected_text: text,

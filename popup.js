@@ -15,6 +15,7 @@ function init() {
     enableToggle: document.getElementById('enableToggle'),
     langSelect: document.getElementById('langSelect'),
     apiBaseInput: document.getElementById('apiBaseInput'),
+    tokenInput: document.getElementById('tokenInput'),
     modelInfo: document.getElementById('modelInfo'),
     modelSelect: document.getElementById('modelSelect'),
     shortcutKey: document.getElementById('shortcutKey'),
@@ -28,10 +29,20 @@ function init() {
   const toggleSwitch = els.enableToggle.closest('.toggle-switch');
   toggleSwitch.classList.add('no-transition');
 
-  // 打开 popup 时强制从后端同步生词本；同步写入镜像后由 onChanged 监听重新渲染
-  if (typeof LCTFavorites !== 'undefined') {
-    LCTFavorites.sync({ force: true });
+  // 访问令牌存在 chrome.storage.sync（随 Chrome 账号跨设备同步）
+  chrome.storage.sync.get(['accessToken'], (result) => {
+    els.tokenInput.value = result.accessToken || '';
+    // 读到 token 后再强制同步生词本（首次填 token 的场景也能立即拉取）
+    if (typeof LCTFavorites !== 'undefined') LCTFavorites.sync({ force: true });
+  });
+
+  function saveToken() {
+    chrome.storage.sync.set({ accessToken: els.tokenInput.value.trim() });
   }
+  els.tokenInput.addEventListener('blur', saveToken);
+  els.tokenInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') els.tokenInput.blur();
+  });
 
   chrome.storage.local.get(
     ['enabled', 'apiBase', 'selectedModel', 'sourceLangMode', 'targetLang', 'lookupHistory', 'favoriteLookups'],
