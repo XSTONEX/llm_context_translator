@@ -171,6 +171,14 @@
 .lct-icon-btn.lct-copied {
   color: var(--lct-copied-color);
 }
+.lct-icon-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.lct-icon-btn:disabled:hover {
+  background: transparent;
+  color: var(--lct-icon-default);
+}
 
 .lct-icon-btn svg {
   width: 15px;
