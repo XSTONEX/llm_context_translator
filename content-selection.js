@@ -90,6 +90,7 @@
     LCT.panel.showTimingBar(null, request.model, request.lang, true);
     LCT.panel.repositionPanel(request.rect);
     LCT.storage.addHistory(data, request);
+    LCT.tts.autoPlay();
   }
 
   async function retryCurrentRequest() {
@@ -173,6 +174,7 @@
             LCT.panel.finalizeStreamingPanel(msg.data, receivedData, request);
             LCT.panel.showTimingBar(elapsed, request.model, request.lang);
             LCT.panel.repositionPanel(request.rect);
+            LCT.tts.autoPlay();
             if (msg.data) {
               await LCT.storage.addHistory(msg.data, request);
               await LCT.storage.setCachedLookup(request, msg.data);
