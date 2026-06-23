@@ -148,7 +148,9 @@
     const favoriteBtn = createIconButton('favorite', ICONS.star, '收藏');
     favoriteBtn.style.display = 'none';
     actions.appendChild(favoriteBtn);
-    actions.appendChild(createIconButton('copy', ICONS.copy, '复制'));
+    const copyBtn = createIconButton('copy', ICONS.copy, '翻译完成后可复制');
+    copyBtn.disabled = true;
+    actions.appendChild(copyBtn);
     const pinBtn = createIconButton('pin', ICONS.pin, '固定');
     pinBtn.classList.toggle('lct-active', state.isPinned);
     actions.appendChild(pinBtn);
@@ -786,6 +788,7 @@
     });
 
     state.currentResponseData = data;
+    setCopyButtonReady(Boolean(getCopyableText(data)));
 
     if (data.definitions && !receivedData.definitions) {
       updateProgressiveField('definitions', data.definitions, { ...receivedData, ...data });
@@ -1194,17 +1197,31 @@
     }, 1500);
   }
 
-  function handleCopy(btn) {
-    const data = state.currentResponseData;
-    let text;
-    if (data && data.isWord && data.definitions && data.definitions.length > 0) {
-      text = data.definitions.map((def) => `${def.partOfSpeech} ${def.meaning}`).join('\n');
-    } else if (data && data.translation) {
-      text = data.translation;
-    } else {
-      text = state.currentText;
+  // 提取「真正的中文意思」：单词取释义，句子取整句翻译，再退到核心翻译；都没有则返回空串
+  function getCopyableText(data) {
+    if (!data) return '';
+    if (data.isWord && data.definitions && data.definitions.length > 0) {
+      return data.definitions.map((def) => `${def.partOfSpeech} ${def.meaning}`).join('\n');
     }
-    navigator.clipboard.writeText(text || '').then(() => showCopyFeedback(btn));
+    if (data.translation) return data.translation;
+    if (data.contextAnalysis && data.contextAnalysis.coreTranslation) {
+      return data.contextAnalysis.coreTranslation;
+    }
+    return '';
+  }
+
+  // 仅在拿到可复制的中文内容后才启用复制按钮，避免流式过程中误复制原文
+  function setCopyButtonReady(ready) {
+    const btn = panelElement && panelElement.querySelector('[data-action="copy"]');
+    if (!btn) return;
+    btn.disabled = !ready;
+    btn.title = ready ? '复制' : '翻译完成后可复制';
+  }
+
+  function handleCopy(btn) {
+    const text = getCopyableText(state.currentResponseData);
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => showCopyFeedback(btn));
   }
 
   async function handleFavorite(btn) {
