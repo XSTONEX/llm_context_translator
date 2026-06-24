@@ -133,6 +133,25 @@
     });
   }
 
+  // 音频就绪后执行回调：已就绪立即执行；加载中则每 100ms 轮询等待（最多 15s）；出错或失败则放弃
+  function whenReady(callback) {
+    if (state.ttsReady) {
+      callback();
+      return;
+    }
+    if (!state.ttsLoading) return;
+
+    const checkInterval = setInterval(() => {
+      if (state.ttsReady) {
+        clearInterval(checkInterval);
+        callback();
+      } else if (!state.ttsLoading) {
+        clearInterval(checkInterval);
+      }
+    }, 100);
+    setTimeout(() => clearInterval(checkInterval), 15000);
+  }
+
   function handleSpeakerClick() {
     if (state.ttsReady) {
       playTTS();
@@ -144,23 +163,52 @@
       return;
     }
 
-    if (state.ttsLoading) {
-      const checkInterval = setInterval(() => {
-        if (state.ttsReady) {
-          clearInterval(checkInterval);
-          playTTS();
-        } else if (!state.ttsLoading) {
-          clearInterval(checkInterval);
-        }
-      }, 100);
-      setTimeout(() => clearInterval(checkInterval), 15000);
+    if (state.ttsLoading) whenReady(playTTS);
+  }
+
+  // 连续播放音频 N 遍：靠 ended 事件链式重播，播满后停止
+  function playTimes(times) {
+    if (times <= 0 || !state.ttsBlobUrl || !state.ttsReady) return;
+
+    // 先停掉正在播放的音频，避免快速连续划词时声音叠加
+    if (state.ttsAudio) {
+      state.ttsAudio.pause();
+      state.ttsAudio = null;
     }
+
+    let remaining = times;
+    const playOnce = () => {
+      const audio = new Audio(state.ttsBlobUrl);
+      state.ttsAudio = audio;
+      audio.addEventListener('ended', () => {
+        state.ttsAudio = null;
+        remaining -= 1;
+        if (remaining > 0) playOnce();
+      });
+      audio.play().catch((err) => {
+        console.error('[LCT] Audio playback failed:', err);
+        state.ttsAudio = null;
+        state.ttsError = true;
+        updateSpeakerButtonState();
+      });
+    };
+    playOnce();
+  }
+
+  // 全部内容加载完成后调用：按用户设置自动播放（off 不播 / once 一遍 / thrice 三遍）
+  async function autoPlay() {
+    const result = await LCT.storage.get(['ttsPlayMode']);
+    const mode = result.ttsPlayMode || 'off';
+    const times = mode === 'thrice' ? 3 : mode === 'once' ? 1 : 0;
+    if (times === 0) return;
+    whenReady(() => playTimes(times));
   }
 
   LCT.tts = {
     cleanup,
     fetchTTS,
     updateSpeakerButtonState,
-    handleSpeakerClick
+    handleSpeakerClick,
+    autoPlay
   };
 })();

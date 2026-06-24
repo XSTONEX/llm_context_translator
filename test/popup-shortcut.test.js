@@ -47,6 +47,7 @@ function loadPopup() {
     statusDot: createElement('statusDot'),
     enableToggle: createElement('enableToggle'),
     langSelect: createElement('langSelect'),
+    ttsPlayModeSelect: createElement('ttsPlayModeSelect'),
     apiBaseInput: createElement('apiBaseInput'),
     tokenInput: createElement('tokenInput'),
     modelInfo: createElement('modelInfo'),
@@ -119,7 +120,7 @@ function loadPopup() {
           callback([
             {
               name: 'toggle-enabled',
-              shortcut: 'Command+Shift+Y'
+              shortcut: 'Command+Shift+L'
             }
           ]);
         }
@@ -147,8 +148,8 @@ function loadPopup() {
 
 const harness = loadPopup();
 
-assert.equal(harness.elements.shortcutKey.textContent, 'Command+Shift+Y');
-assert.equal(harness.elements.shortcutKey.title, 'Command+Shift+Y');
+assert.equal(harness.elements.shortcutKey.textContent, 'Command+Shift+L');
+assert.equal(harness.elements.shortcutKey.title, 'Command+Shift+L');
 
 harness.elements.shortcutCustomizeButton.dispatch('click');
 assert.equal(harness.createdTabs.length, 1);

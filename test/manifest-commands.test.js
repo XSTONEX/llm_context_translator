@@ -9,8 +9,8 @@ const manifest = JSON.parse(
 const command = manifest.commands && manifest.commands['toggle-enabled'];
 
 assert.ok(command, 'manifest declares the toggle-enabled command');
-assert.equal(command.suggested_key.default, 'Ctrl+Shift+Y');
-assert.equal(command.suggested_key.mac, 'Command+Shift+Y');
+assert.equal(command.suggested_key.default, 'Ctrl+Shift+L');
+assert.equal(command.suggested_key.mac, 'Command+Shift+L');
 assert.equal(command.description, '开启/关闭划词翻译');
 assert.equal(
   Object.prototype.hasOwnProperty.call(command, 'global'),

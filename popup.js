@@ -14,6 +14,7 @@ function init() {
     statusDot: document.getElementById('statusDot'),
     enableToggle: document.getElementById('enableToggle'),
     langSelect: document.getElementById('langSelect'),
+    ttsPlayModeSelect: document.getElementById('ttsPlayModeSelect'),
     apiBaseInput: document.getElementById('apiBaseInput'),
     tokenInput: document.getElementById('tokenInput'),
     modelInfo: document.getElementById('modelInfo'),
@@ -45,7 +46,7 @@ function init() {
   });
 
   chrome.storage.local.get(
-    ['enabled', 'apiBase', 'selectedModel', 'sourceLangMode', 'targetLang', 'lookupHistory', 'favoriteLookups'],
+    ['enabled', 'apiBase', 'selectedModel', 'sourceLangMode', 'targetLang', 'ttsPlayMode', 'lookupHistory', 'favoriteLookups'],
     (result) => {
       const enabled = result.enabled !== undefined ? result.enabled : true;
       const apiBase = result.apiBase || DEFAULT_API_BASE;
@@ -55,6 +56,7 @@ function init() {
       els.enableToggle.checked = enabled;
       els.apiBaseInput.value = apiBase;
       els.langSelect.value = sourceLangMode;
+      els.ttsPlayModeSelect.value = result.ttsPlayMode || 'off';
 
       toggleSwitch.offsetHeight;
       toggleSwitch.classList.remove('no-transition');
@@ -72,6 +74,10 @@ function init() {
       sourceLangMode: els.langSelect.value,
       targetLang: els.langSelect.value === 'auto' ? 'en' : els.langSelect.value,
     });
+  });
+
+  els.ttsPlayModeSelect.addEventListener('change', () => {
+    chrome.storage.local.set({ ttsPlayMode: els.ttsPlayModeSelect.value });
   });
 
   els.enableToggle.addEventListener('change', () => {
