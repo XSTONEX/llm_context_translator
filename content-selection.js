@@ -85,12 +85,12 @@
   function serveFromCache(request, data) {
     if (!LCT.client.isCurrent(request.id)) return;
     triggerTTS(request, data);
+    LCT.tts.autoPlay();
     LCT.panel.showProgressivePanel(request.rect, request);
     LCT.panel.finalizeStreamingPanel(data, { lang: request.lang }, request);
     LCT.panel.showTimingBar(null, request.model, request.lang, true);
     LCT.panel.repositionPanel(request.rect);
     LCT.storage.addHistory(data, request);
-    LCT.tts.autoPlay();
   }
 
   async function retryCurrentRequest() {
@@ -111,6 +111,7 @@
     let ttsTriggered = false;
     if (request.lang !== 'ja') {
       LCT.tts.fetchTTS(request.text);
+      LCT.tts.autoPlay();
       ttsTriggered = true;
     } else {
       LCT.tts.cleanup();
@@ -143,9 +144,11 @@
             if (request.lang === 'ja' && !ttsTriggered) {
               if (msg.name === 'isWord' && msg.value === false) {
                 LCT.tts.fetchTTS(receivedData.query || request.text);
+                LCT.tts.autoPlay();
                 ttsTriggered = true;
               } else if (msg.name === 'kana' && msg.value) {
                 LCT.tts.fetchTTS(msg.value);
+                LCT.tts.autoPlay();
                 ttsTriggered = true;
               }
             }
@@ -174,7 +177,6 @@
             LCT.panel.finalizeStreamingPanel(msg.data, receivedData, request);
             LCT.panel.showTimingBar(elapsed, request.model, request.lang);
             LCT.panel.repositionPanel(request.rect);
-            LCT.tts.autoPlay();
             if (msg.data) {
               await LCT.storage.addHistory(msg.data, request);
               await LCT.storage.setCachedLookup(request, msg.data);

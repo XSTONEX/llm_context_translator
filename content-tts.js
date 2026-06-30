@@ -64,12 +64,15 @@
       return;
     }
 
-    const apiBase = await LCT.storage.getApiBase();
-    const controller = new AbortController();
-    state.ttsAbortController = controller;
+    // 同步置「加载中」，让随后调用的 autoPlay 能立刻 arm whenReady。
+    // getApiBase 是异步的，若等到 await 之后再置位，autoPlay 会先看到「未加载」而提前放弃。
     state.ttsLoading = true;
     state.ttsError = false;
     updateSpeakerButtonState();
+
+    const apiBase = await LCT.storage.getApiBase();
+    const controller = new AbortController();
+    state.ttsAbortController = controller;
 
     try {
       const response = await fetch(`${apiBase}/api/tts`, {
@@ -195,7 +198,8 @@
     playOnce();
   }
 
-  // 全部内容加载完成后调用：按用户设置自动播放（off 不播 / once 一遍 / thrice 三遍）
+  // TTS 触发后立即调用：音频一就绪就按用户设置自动播放（off 不播 / once 一遍 / thrice 三遍），
+  // 不再等整段翻译流式输出结束
   async function autoPlay() {
     const result = await LCT.storage.get(['ttsPlayMode']);
     const mode = result.ttsPlayMode || 'off';
