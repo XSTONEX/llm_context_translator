@@ -40,6 +40,9 @@
 
     shadowRoot = hostElement.attachShadow({ mode: 'open' });
     panelElement = null;
+    // toast 挂在旧 shadowRoot 上，重建后必须丢弃引用，否则 showToast 会写进已分离的节点
+    clearTimeout(toastTimer);
+    toastElement = null;
     state.panelEventsBound = false;
     state.dragEventsBound = false;
 
@@ -856,12 +859,12 @@
 
     panelElement.querySelectorAll('.lct-example').forEach((el) => {
       const text = el.textContent;
-      if (text) el.innerHTML = highlightWord(text, query);
+      if (text) setHighlightedContent(el, text, query);
     });
 
     const analysisEl = panelElement.querySelector('.lct-analysis-text');
     if (analysisEl && analysisEl.textContent) {
-      analysisEl.innerHTML = highlightWord(analysisEl.textContent, query);
+      setHighlightedContent(analysisEl, analysisEl.textContent, query);
     }
   }
 
@@ -914,7 +917,7 @@
         def.examples.forEach((ex) => {
           const exEl = document.createElement('div');
           exEl.classList.add('lct-example');
-          exEl.innerHTML = highlightWord(ex.sentence, data.query);
+          setHighlightedContent(exEl, ex.sentence, data.query);
           container.appendChild(exEl);
 
           if (ex.translation) {
@@ -930,14 +933,41 @@
     return container;
   }
 
-  function highlightWord(sentence, word) {
-    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp('(' + escaped + ')', 'gi');
-    const safe = sentence
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
-    return safe.replace(regex, '<mark class="lct-highlight">$1</mark>');
+  // 用 DOM 节点构建高亮内容（文本节点 + <mark>），避免 innerHTML 字符串替换
+  // 在查询词含 &/</> 等字符时匹配失败或拆坏转义实体
+  function buildHighlightedFragment(sentence, word) {
+    const frag = document.createDocumentFragment();
+    const text = sentence == null ? '' : String(sentence);
+    if (!text) return frag;
+    if (!word) {
+      frag.appendChild(document.createTextNode(text));
+      return frag;
+    }
+
+    const escaped = String(word).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escaped, 'gi');
+    let lastIndex = 0;
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+      if (match[0].length === 0) break;
+      if (match.index > lastIndex) {
+        frag.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
+      }
+      const mark = document.createElement('mark');
+      mark.classList.add('lct-highlight');
+      mark.textContent = match[0];
+      frag.appendChild(mark);
+      lastIndex = match.index + match[0].length;
+    }
+    if (lastIndex < text.length) {
+      frag.appendChild(document.createTextNode(text.slice(lastIndex)));
+    }
+    return frag;
+  }
+
+  function setHighlightedContent(el, sentence, word) {
+    el.textContent = '';
+    el.appendChild(buildHighlightedFragment(sentence, word));
   }
 
   function buildContextAnalysis(data) {
@@ -1019,6 +1049,8 @@
 
   function showErrorPanel(error, request) {
     ensurePanel();
+    // 清掉去重标记，让用户重新划选同一段文本时能直接重新发起请求（而不只能点重试）
+    state.currentText = '';
     panelElement.innerHTML = '';
     panelElement.appendChild(buildToolbar());
 

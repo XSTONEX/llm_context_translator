@@ -173,6 +173,13 @@
               LCT.client.disconnectActivePort();
               break;
             }
+            // 日语兜底：流式过程中没等到 kana（LLM 未返回或为空）时，
+            // 用与缓存路径一致的规则（kana || query）触发 TTS，避免喇叭按钮失效
+            if (request.lang === 'ja' && !ttsTriggered) {
+              triggerTTS(request, msg.data);
+              LCT.tts.autoPlay();
+              ttsTriggered = true;
+            }
             const elapsed = ((Date.now() - request.startTime) / 1000).toFixed(2);
             LCT.panel.finalizeStreamingPanel(msg.data, receivedData, request);
             LCT.panel.showTimingBar(elapsed, request.model, request.lang);
