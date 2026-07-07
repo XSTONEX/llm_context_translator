@@ -61,6 +61,18 @@
     });
   }
 
+  function getSyncedAt() {
+    return new Promise((resolve) => {
+      chrome.storage.local.get(['favoritesSyncedAt'], (r) => {
+        resolve((r && r.favoritesSyncedAt) || 0);
+      });
+    });
+  }
+
+  function lookupKey(item) {
+    return [item.lang || 'en', (item.query || '').trim().toLowerCase()].join('::');
+  }
+
   const api = {
     list: () => call('GET', '/api/favorites'),
     add: (item) => call('POST', '/api/favorites', item),
@@ -69,25 +81,31 @@
     getMirror,
     setMirror,
 
-    // 从后端拉取覆盖本地镜像；首次发现「后端空 + 本地有」则把本地迁移上去。
+    // 从后端拉取并与本地镜像合并；首次发现「后端空 + 本地有」则把本地迁移上去。
     async sync({ force = false } = {}) {
       try {
-        if (!force) {
-          const r = await new Promise((res) =>
-            chrome.storage.local.get(['favoritesSyncedAt'], res)
-          );
-          if (r.favoritesSyncedAt && Date.now() - r.favoritesSyncedAt < SYNC_TTL_MS) {
-            return;
-          }
+        const syncedAt = await getSyncedAt();
+        if (!force && syncedAt && Date.now() - syncedAt < SYNC_TTL_MS) {
+          return;
         }
         const data = await api.list();
         const remote = (data && data.favorites) || [];
         const local = await getMirror();
         if (remote.length === 0 && local.length > 0) {
           await api.bulkImport(local); // 迁移：保留本地镜像，同时写入后端
-        } else {
-          await setMirror(remote); // 后端权威：覆盖本地镜像
+          await markSynced();
+          return;
         }
+        // 本地独有条目：上次同步之后才收藏的视为「离线新增」，补推后端并保留；
+        // 上次同步之前就存在而远端没有的，视为已在其他设备删除，本地丢弃。
+        const remoteKeys = new Set(remote.map(lookupKey));
+        const pendingAdds = local.filter(
+          (item) =>
+            !remoteKeys.has(lookupKey(item)) &&
+            (!syncedAt || (item.timestamp || 0) > syncedAt)
+        );
+        if (pendingAdds.length > 0) await api.bulkImport(pendingAdds);
+        await setMirror([...pendingAdds, ...remote]);
         await markSynced();
       } catch (err) {
         // 离线/后端不可达：保留本地镜像，下次再同步

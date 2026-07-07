@@ -5,7 +5,13 @@ from collections import deque
 import unittest
 
 import storage
-from app import build_chat_payload, check_rate_limit, require_access_token, resolve_user_id
+from app import (
+    build_chat_payload,
+    check_rate_limit,
+    ensure_done_event_fields,
+    require_access_token,
+    resolve_user_id,
+)
 from fastapi import HTTPException
 from json_stream_parser import JsonStreamParser
 from language_strategy import EnglishStrategy, JapaneseStrategy
@@ -68,6 +74,33 @@ class JsonStreamParserTests(unittest.TestCase):
         done = events[-1]
         self.assertEqual(done["type"], "done")
         self.assertIsNone(done["data"]["definitions"])
+
+
+class DoneEventFieldsTests(unittest.TestCase):
+    def test_done_event_data_gets_default_fields(self):
+        # 解析器主路径的 done 带 LLM 原始输出，可能缺 query/isWord 等字段
+        event = {"type": "done", "data": {"translation": "你好"}}
+
+        result = ensure_done_event_fields(event, EnglishStrategy(), "hello world you", False)
+
+        self.assertEqual(result["data"]["query"], "hello world you")
+        self.assertFalse(result["data"]["isWord"])
+        self.assertIn("contextAnalysis", result["data"])
+        self.assertIn("syntaxAnalysis", result["data"])
+
+    def test_non_done_events_pass_through_unchanged(self):
+        event = {"type": "field", "name": "query", "value": "hello"}
+
+        result = ensure_done_event_fields(event, EnglishStrategy(), "hello", True)
+
+        self.assertEqual(result, {"type": "field", "name": "query", "value": "hello"})
+
+    def test_done_event_with_non_dict_data_passes_through(self):
+        event = {"type": "done", "data": None}
+
+        result = ensure_done_event_fields(event, EnglishStrategy(), "hello", True)
+
+        self.assertIsNone(result["data"])
 
 
 class LanguageStrategyTests(unittest.TestCase):

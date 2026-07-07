@@ -246,6 +246,19 @@ def build_chat_payload(
 # ========== 流式端点 ==========
 
 
+def ensure_done_event_fields(event: dict, strategy, selected_text: str, word_mode: bool) -> dict:
+    """done 事件的数据在发给前端前统一兜底填充默认字段。
+
+    解析器主路径（完整 JSON 一次解析成功）发出的 done 带的是 LLM 原始输出，
+    与末尾兜底路径不同，不经过 ensure_response_fields —— 在转发层统一补齐。
+    """
+    if event.get("type") == "done" and isinstance(event.get("data"), dict):
+        event["data"] = strategy.ensure_response_fields(
+            event["data"], selected_text, word_mode
+        )
+    return event
+
+
 async def stream_llm_response(
     session: aiohttp.ClientSession,
     selected_text: str,
@@ -289,6 +302,9 @@ async def stream_llm_response(
                     if content:
                         events = parser.feed(content)
                         for event in events:
+                            event = ensure_done_event_fields(
+                                event, strategy, selected_text, word_mode
+                            )
                             yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
                 except json.JSONDecodeError:
                     continue

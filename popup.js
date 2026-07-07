@@ -38,7 +38,14 @@ function init() {
   });
 
   function saveToken() {
-    chrome.storage.sync.set({ accessToken: els.tokenInput.value.trim() });
+    const value = els.tokenInput.value.trim();
+    chrome.storage.sync.get(['accessToken'], (result) => {
+      if ((result.accessToken || '') === value) return;
+      chrome.storage.sync.set({ accessToken: value }, () => {
+        // 令牌变化后立即用新令牌重新同步生词本（首次填 token 无需重开 popup）
+        if (typeof LCTFavorites !== 'undefined') LCTFavorites.sync({ force: true });
+      });
+    });
   }
   els.tokenInput.addEventListener('blur', saveToken);
   els.tokenInput.addEventListener('keydown', (e) => {
@@ -200,6 +207,11 @@ async function loadModels(apiBase, selectEl, modelInfoEl, savedModel) {
     modelInfoEl.textContent = selectedOption ? '当前模型: ' + selectedOption.text : '当前模型: 无可用模型';
     selectEl.disabled = models.length === 0;
     chrome.storage.local.set({ modelList: models });
+    // 把实际生效的选择写回 storage：换后端地址或已存模型下架时，
+    // 避免翻译请求继续携带失效的旧模型 ID
+    if (selectEl.value && selectEl.value !== savedModel) {
+      chrome.storage.local.set({ selectedModel: selectEl.value });
+    }
   } catch {
     chrome.storage.local.get(['modelList', 'selectedModel'], (result) => {
       const cachedModels = Array.isArray(result.modelList) ? result.modelList : [];
@@ -317,6 +329,10 @@ function removeFavorite(item) {
     chrome.storage.local.set({
       favoriteLookups: favorites.filter((entry) => lookupKey(entry) !== target),
     });
+    // 同步删除后端，否则下次同步时该词条会从后端拉回来（失败不阻塞本地删除）
+    if (typeof LCTFavorites !== 'undefined') {
+      LCTFavorites.remove(item.lang, item.query).catch(() => {});
+    }
   });
 }
 
