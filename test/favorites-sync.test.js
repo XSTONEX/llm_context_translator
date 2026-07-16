@@ -45,16 +45,35 @@ function createHarness({ storage = {}, remoteFavorites = [] } = {}) {
     },
     fetch: async (url, options = {}) => {
       const method = options.method || 'GET';
+      const path = String(url).replace(/^https?:\/\/[^/]+/, '');
       calls.push({
         url,
         method,
         body: options.body ? JSON.parse(options.body) : null
       });
-      if (url.endsWith('/api/favorites') && method === 'GET') {
+      if (path === '/api/favorites' && method === 'GET') {
         return {
           ok: true,
           status: 200,
           json: async () => ({ favorites: remoteFavorites })
+        };
+      }
+      // bulk / add 后测试里远端列表不自动更新；ensure-audio 返回当前镜像形参
+      if (path === '/api/favorites/ensure-audio' && method === 'POST') {
+        const favorites = Array.isArray(store.favoriteLookups)
+          ? store.favoriteLookups
+          : remoteFavorites;
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            checked: 0,
+            filled: 0,
+            failed: 0,
+            remaining: 0,
+            favorites
+          })
         };
       }
       return { ok: true, status: 200, json: async () => ({ ok: true }) };
@@ -129,7 +148,7 @@ async function run() {
     assert.deepEqual(queries(harness.store.favoriteLookups), ['shared']);
   }
 
-  // 场景 4：非强制同步且未过 TTL → 不发任何请求
+  // 场景 4：非强制同步且未过 TTL、本地无缺音频 → 不发任何请求
   {
     const harness = createHarness({
       storage: { favoriteLookups: [], favoritesSyncedAt: Date.now() },
@@ -138,6 +157,23 @@ async function run() {
     await harness.api.sync();
 
     assert.equal(harness.calls.length, 0, 'TTL throttles sync');
+  }
+
+  // 场景 5：TTL 内但本地有缺 audioKey 的词 → 仍会 ensure-audio
+  {
+    const harness = createHarness({
+      storage: {
+        favoriteLookups: [{ query: 'need-audio', lang: 'en', timestamp: 1 }],
+        favoritesSyncedAt: Date.now()
+      },
+      remoteFavorites: []
+    });
+    await harness.api.sync();
+
+    const ensure = harness.calls.find((c) =>
+      String(c.url).includes('/api/favorites/ensure-audio')
+    );
+    assert.ok(ensure, 'TTL path still backfills missing audio');
   }
 }
 

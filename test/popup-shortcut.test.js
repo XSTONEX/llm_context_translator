@@ -48,6 +48,7 @@ function loadPopup() {
     enableToggle: createElement('enableToggle'),
     langSelect: createElement('langSelect'),
     ttsPlayModeSelect: createElement('ttsPlayModeSelect'),
+    themeSelect: createElement('themeSelect'),
     apiBaseInput: createElement('apiBaseInput'),
     tokenInput: createElement('tokenInput'),
     modelInfo: createElement('modelInfo'),
@@ -66,7 +67,26 @@ function loadPopup() {
   const context = {
     console,
     DEFAULT_API_BASE: 'https://hover.sqw.org.cn',
+    DEFAULT_THEME_MODE: 'system',
+    THEME_MODE_KEY: 'themeMode',
+    normalizeThemeMode(mode) {
+      return mode === 'light' || mode === 'dark' || mode === 'system' ? mode : 'system';
+    },
+    resolveEffectiveTheme(mode) {
+      if (mode === 'light' || mode === 'dark') return mode;
+      return 'light';
+    },
+    matchMedia() {
+      return {
+        matches: false,
+        addEventListener() {},
+        addListener() {},
+      };
+    },
     document: {
+      documentElement: {
+        dataset: {},
+      },
       addEventListener(type, listener) {
         if (type === 'DOMContentLoaded') domReadyListener = listener;
       },

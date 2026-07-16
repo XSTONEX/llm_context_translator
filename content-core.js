@@ -225,8 +225,22 @@
       // 再尽力推送到后端（失败不影响本地，下次同步以后端为准）
       if (globalThis.LCTFavorites) {
         try {
-          if (exists) await globalThis.LCTFavorites.remove(request.lang, data.query);
-          else await globalThis.LCTFavorites.add(item);
+          if (exists) {
+            await globalThis.LCTFavorites.remove(request.lang, data.query);
+          } else {
+            // 后端 add 可能已生成 audioKey；写回本地镜像，避免下次打开再全量补音频
+            const res = await globalThis.LCTFavorites.add(item);
+            const saved = res && res.favorite;
+            if (saved && saved.audioKey) {
+              const mirror = await getStorage(['favoriteLookups']);
+              const list = Array.isArray(mirror.favoriteLookups) ? mirror.favoriteLookups : [];
+              const idx = list.findIndex((entry) => getLookupKey(entry) === key);
+              if (idx >= 0) {
+                list[idx] = { ...list[idx], ...saved };
+                await setStorage({ favoriteLookups: list });
+              }
+            }
+          }
         } catch (err) {
           console.warn('[LCT] favorite backend sync failed:', err && err.message);
         }

@@ -55,6 +55,32 @@ def list_favorites(user_id: str) -> list[dict]:
     return [json.loads(row["payload"]) for row in rows]
 
 
+def get_favorite(user_id: str, lang: str, query: str) -> dict | None:
+    """按 lang + query 取单条生词；不存在返回 None。"""
+    qkey = _qkey(query)
+    if not qkey:
+        return None
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT payload FROM favorites WHERE user_id = ? AND lang = ? AND qkey = ?",
+            (user_id, lang or "en", qkey),
+        ).fetchone()
+    return json.loads(row["payload"]) if row else None
+
+
+def set_favorite_audio(
+    user_id: str, lang: str, query: str, audio_key: str, voice: str = "alloy"
+) -> dict | None:
+    """给已存在的生词写入 audioKey / audioVoice。"""
+    item = get_favorite(user_id, lang, query)
+    if not item:
+        return None
+    item["audioKey"] = audio_key
+    item["audioVoice"] = voice
+    upsert_favorite(user_id, item)
+    return item
+
+
 def upsert_favorite(user_id: str, item: dict) -> None:
     """新增或更新一条生词；payload 原样保存前端的收藏对象。"""
     qkey = _qkey(item.get("query", ""))

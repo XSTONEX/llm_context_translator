@@ -5,6 +5,40 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>划词翻译设置</title>
   <style>
+    :root {
+      --bg: #ffffff;
+      --text: #1a1a1a;
+      --text-secondary: #6b7280;
+      --text-faint: #9ca3af;
+      --text-input: #374151;
+      --border: #e5e7eb;
+      --surface: #f6f7f9;
+      --surface-btn: #ffffff;
+      --accent: #007AFF;
+      --accent-soft: rgba(0, 122, 255, 0.15);
+      --toggle-off: #e5e7eb;
+      --toggle-knob: #ffffff;
+      --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+      color-scheme: light;
+    }
+
+    :root[data-theme="dark"] {
+      --bg: #1c1c1e;
+      --text: #f5f5f7;
+      --text-secondary: #a1a1aa;
+      --text-faint: #71717a;
+      --text-input: #e5e5ea;
+      --border: #3a3a3c;
+      --surface: #2c2c2e;
+      --surface-btn: #3a3a3c;
+      --accent: #0a84ff;
+      --accent-soft: rgba(10, 132, 255, 0.25);
+      --toggle-off: #3a3a3c;
+      --toggle-knob: #f5f5f7;
+      --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a1a1aa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+      color-scheme: dark;
+    }
+
     * {
       margin: 0;
       padding: 0;
@@ -17,8 +51,8 @@
                    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
                    sans-serif;
       font-size: 14px;
-      color: #1a1a1a;
-      background: #ffffff;
+      color: var(--text);
+      background: var(--bg);
     }
 
     .popup-container {
@@ -36,7 +70,7 @@
     .popup-title {
       font-size: 16px;
       font-weight: 700;
-      color: #1a1a1a;
+      color: var(--text);
       letter-spacing: -0.01em;
     }
 
@@ -44,7 +78,7 @@
       width: 8px;
       height: 8px;
       border-radius: 50%;
-      background: #9ca3af;
+      background: var(--text-faint);
       flex-shrink: 0;
     }
 
@@ -59,7 +93,7 @@
     }
 
     .status-dot.status-checking {
-      background: #9ca3af;
+      background: var(--text-faint);
       animation: breathe-gray 1s ease-in-out infinite;
     }
 
@@ -81,7 +115,7 @@
     /* Divider */
     .popup-divider {
       height: 1px;
-      background: #e5e7eb;
+      background: var(--border);
       margin-bottom: 14px;
     }
 
@@ -100,7 +134,7 @@
 
     .control-label {
       font-size: 14px;
-      color: #1a1a1a;
+      color: var(--text);
       font-weight: 500;
     }
 
@@ -122,7 +156,7 @@
     .toggle-slider {
       position: absolute;
       inset: 0;
-      background: #e5e7eb;
+      background: var(--toggle-off);
       border-radius: 24px;
       cursor: pointer;
       transition: background 0.3s ease;
@@ -135,14 +169,14 @@
       top: 2px;
       width: 20px;
       height: 20px;
-      background: #ffffff;
+      background: var(--toggle-knob);
       border-radius: 50%;
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
       transition: transform 0.3s ease;
     }
 
     .toggle-switch input:checked + .toggle-slider {
-      background: #007AFF;
+      background: var(--accent);
     }
 
     .toggle-switch input:checked + .toggle-slider::before {
@@ -162,21 +196,21 @@
       padding: 0 8px;
       font-size: 12px;
       font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
-      color: #374151;
-      background: #f6f7f9;
-      border: 1px solid #e5e7eb;
+      color: var(--text-input);
+      background: var(--surface);
+      border: 1px solid var(--border);
       border-radius: 6px;
       outline: none;
       transition: border-color 0.2s ease, box-shadow 0.2s ease;
     }
 
     .api-input:focus {
-      border-color: #007AFF;
-      box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.15);
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-soft);
     }
 
     .api-input::placeholder {
-      color: #9ca3af;
+      color: var(--text-faint);
     }
 
     /* Model Select */
@@ -186,35 +220,35 @@
       padding: 0 24px 0 8px;
       font-size: 12px;
       font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-      color: #374151;
-      background: #f6f7f9;
-      border: 1px solid #e5e7eb;
+      color: var(--text-input);
+      background-color: var(--surface);
+      border: 1px solid var(--border);
       border-radius: 6px;
       outline: none;
       cursor: pointer;
       transition: border-color 0.2s ease, box-shadow 0.2s ease;
       appearance: none;
       -webkit-appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+      background-image: var(--select-chevron);
       background-repeat: no-repeat;
       background-position: right 8px center;
       background-size: 12px;
     }
 
     .model-select:focus {
-      border-color: #007AFF;
-      box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.15);
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-soft);
     }
 
     .model-select optgroup {
       font-weight: 600;
-      color: #6b7280;
+      color: var(--text-secondary);
       font-size: 11px;
     }
 
     .model-select option {
       font-weight: 400;
-      color: #374151;
+      color: var(--text-input);
       padding: 4px 8px;
     }
 
@@ -225,7 +259,7 @@
 
     .model-info {
       font-size: 12px;
-      color: #9ca3af;
+      color: var(--text-faint);
       font-weight: 400;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -236,13 +270,13 @@
     .popup-section {
       margin-top: 14px;
       padding-top: 12px;
-      border-top: 1px solid #e5e7eb;
+      border-top: 1px solid var(--border);
     }
 
     .section-title {
       font-size: 12px;
       font-weight: 700;
-      color: #6b7280;
+      color: var(--text-secondary);
       margin-bottom: 8px;
     }
 
@@ -276,8 +310,8 @@
       gap: 4px 8px;
       align-items: center;
       padding: 7px 8px;
-      background: #f6f7f9;
-      border: 1px solid #e5e7eb;
+      background: var(--surface);
+      border: 1px solid var(--border);
       border-radius: 6px;
     }
 
@@ -288,7 +322,7 @@
     .lookup-query {
       font-size: 12px;
       font-weight: 600;
-      color: #1a1a1a;
+      color: var(--text);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -296,7 +330,7 @@
 
     .lookup-sub {
       font-size: 11px;
-      color: #9ca3af;
+      color: var(--text-faint);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -310,8 +344,8 @@
 
     .mini-btn {
       border: 0;
-      background: #ffffff;
-      color: #6b7280;
+      background: var(--surface-btn);
+      color: var(--text-secondary);
       border-radius: 5px;
       font-size: 11px;
       height: 24px;
@@ -320,7 +354,7 @@
     }
 
     .mini-btn:hover {
-      color: #007AFF;
+      color: var(--accent);
     }
 
     .shortcut-row {
@@ -340,10 +374,10 @@
       padding: 0 7px;
       display: inline-flex;
       align-items: center;
-      border: 1px solid #e5e7eb;
+      border: 1px solid var(--border);
       border-radius: 5px;
-      background: #f6f7f9;
-      color: #374151;
+      background: var(--surface);
+      color: var(--text-input);
       font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
       font-size: 11px;
       white-space: nowrap;
@@ -352,11 +386,27 @@
     }
 
     .empty-state {
-      color: #9ca3af;
+      color: var(--text-faint);
       font-size: 12px;
       padding: 8px 0;
     }
   </style>
+  <script>
+    // 尽早应用主题，减少 popup 打开时的闪白/闪黑
+    (function () {
+      try {
+        chrome.storage.local.get(['themeMode'], function (r) {
+          var mode = r.themeMode;
+          if (mode !== 'light' && mode !== 'dark' && mode !== 'system') mode = 'system';
+          var effective = mode;
+          if (mode === 'system') {
+            effective = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          }
+          document.documentElement.dataset.theme = effective;
+        });
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body>
   <div class="popup-container">
@@ -391,6 +441,15 @@
           <option value="off">永久不播放</option>
           <option value="once">播放一遍</option>
           <option value="thrice">播放三遍</option>
+        </select>
+      </div>
+
+      <div class="control-row">
+        <span class="control-label">外观</span>
+        <select id="themeSelect" class="model-select">
+          <option value="system">跟随系统</option>
+          <option value="light">浅色</option>
+          <option value="dark">深色</option>
         </select>
       </div>
 
