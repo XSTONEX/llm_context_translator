@@ -10,8 +10,68 @@ const progressEl = document.getElementById('progress');
 let deck = [];
 let index = 0;
 let flipped = false;
+let themeMode = typeof DEFAULT_THEME_MODE !== 'undefined' ? DEFAULT_THEME_MODE : 'system';
+const themeKey = typeof THEME_MODE_KEY !== 'undefined' ? THEME_MODE_KEY : 'themeMode';
+
+// 当前卡片发音
+let currentAudio = null;
+let audioObjectUrl = null;
+let audioLoading = false;
+let audioError = false;
+let speakBtnEl = null;
+let playRequestId = 0;
+
+function applyDocumentTheme(mode) {
+  const resolve =
+    typeof resolveEffectiveTheme === 'function'
+      ? resolveEffectiveTheme
+      : (m) => {
+          if (m === 'light' || m === 'dark') return m;
+          try {
+            return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          } catch (e) {
+            return 'light';
+          }
+        };
+  document.documentElement.dataset.theme = resolve(mode);
+}
+
+function setThemeMode(mode) {
+  const normalize =
+    typeof normalizeThemeMode === 'function'
+      ? normalizeThemeMode
+      : (m) => (m === 'light' || m === 'dark' || m === 'system' ? m : 'system');
+  themeMode = normalize(mode);
+  applyDocumentTheme(themeMode);
+}
+
+function initTheme() {
+  chrome.storage.local.get([themeKey], (result) => {
+    setThemeMode(result[themeKey]);
+  });
+
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local' || !changes[themeKey]) return;
+    setThemeMode(changes[themeKey].newValue);
+  });
+
+  try {
+    const mediaQuery = matchMedia('(prefers-color-scheme: dark)');
+    const onSystemThemeChange = () => {
+      if (themeMode === 'system') applyDocumentTheme('system');
+    };
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', onSystemThemeChange);
+    } else if (mediaQuery.addListener) {
+      mediaQuery.addListener(onSystemThemeChange);
+    }
+  } catch (e) {
+    // matchMedia 不可用时忽略
+  }
+}
 
 document.addEventListener('DOMContentLoaded', () => {
+  initTheme();
   // 先从后端强制同步，再从本地镜像加载
   const ready = (typeof LCTFavorites !== 'undefined')
     ? LCTFavorites.sync({ force: true })
@@ -23,9 +83,7 @@ function load() {
   chrome.storage.local.get(['favoriteLookups'], (result) => {
     const favorites = Array.isArray(result.favoriteLookups) ? result.favoriteLookups : [];
     deck = shuffle(favorites.slice());
-    index = 0;
-    flipped = false;
-    render();
+    showCard(0, { play: deck.length > 0 });
   });
 }
 
@@ -45,10 +103,68 @@ function lookupKey(item) {
   return [item.lang || 'en', (item.query || '').trim().toLowerCase()].join('::');
 }
 
+function stopAudio() {
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio = null;
+  }
+  if (audioObjectUrl) {
+    URL.revokeObjectURL(audioObjectUrl);
+    audioObjectUrl = null;
+  }
+}
+
+function updateSpeakButton() {
+  if (!speakBtnEl) return;
+  speakBtnEl.classList.toggle('is-loading', audioLoading);
+  speakBtnEl.classList.toggle('is-error', audioError && !audioLoading);
+  speakBtnEl.disabled = audioLoading || deck.length === 0;
+  if (audioLoading) speakBtnEl.textContent = '加载中';
+  else if (audioError) speakBtnEl.textContent = '重试发音';
+  else speakBtnEl.textContent = '发音';
+}
+
+async function playCurrentWord() {
+  const item = deck[index];
+  if (!item || !item.query) return;
+  if (typeof LCTFavorites === 'undefined' || !LCTFavorites.fetchAudioBlob) {
+    console.warn('[LCT] favorites audio API unavailable');
+    return;
+  }
+
+  const requestId = ++playRequestId;
+  stopAudio();
+  audioLoading = true;
+  audioError = false;
+  updateSpeakButton();
+
+  try {
+    const blob = await LCTFavorites.fetchAudioBlob(item.lang || 'en', item.query);
+    if (requestId !== playRequestId) return; // 已切卡，丢弃过期响应
+    audioObjectUrl = URL.createObjectURL(blob);
+    currentAudio = new Audio(audioObjectUrl);
+    currentAudio.addEventListener('ended', () => {
+      currentAudio = null;
+    });
+    await currentAudio.play();
+  } catch (err) {
+    if (requestId !== playRequestId) return;
+    audioError = true;
+    console.warn('[LCT] review audio failed:', err && err.message);
+  } finally {
+    if (requestId === playRequestId) {
+      audioLoading = false;
+      updateSpeakButton();
+    }
+  }
+}
+
 function render() {
   stage.innerHTML = '';
+  speakBtnEl = null;
 
   if (deck.length === 0) {
+    stopAudio();
     progressEl.textContent = '';
     const empty = document.createElement('div');
     empty.classList.add('empty');
@@ -70,10 +186,14 @@ function render() {
   card.appendChild(langTag);
 
   if (!flipped) {
+    const row = document.createElement('div');
+    row.classList.add('card-front-row');
+
     const word = document.createElement('div');
     word.classList.add('card-front-word');
     word.textContent = item.query || '--';
-    card.appendChild(word);
+    row.appendChild(word);
+    card.appendChild(row);
 
     const hint = document.createElement('div');
     hint.classList.add('card-hint');
@@ -86,6 +206,7 @@ function render() {
   stage.appendChild(card);
   stage.appendChild(buildControls());
   stage.appendChild(buildKbdHint());
+  updateSpeakButton();
 }
 
 function buildBack(item) {
@@ -147,6 +268,12 @@ function buildControls() {
   nextBtn.disabled = index >= deck.length - 1;
   controls.appendChild(nextBtn);
 
+  speakBtnEl = makeBtn('发音', () => {
+    playCurrentWord();
+  }, 'btn btn-speak');
+  speakBtnEl.addEventListener('click', (e) => e.stopPropagation());
+  controls.appendChild(speakBtnEl);
+
   controls.appendChild(makeBtn('随机重排', reshuffle, 'btn'));
   controls.appendChild(makeBtn('移出生词本', removeCurrent, 'btn btn-danger'));
 
@@ -165,7 +292,7 @@ function buildKbdHint() {
   const hint = document.createElement('div');
   hint.classList.add('kbd-hint');
   hint.innerHTML =
-    '<span class="kbd">空格</span> 翻面 · <span class="kbd">←</span> 上一张 · <span class="kbd">→</span> 下一张';
+    '<span class="kbd">空格</span> 翻面 · <span class="kbd">←</span> 上一张 · <span class="kbd">→</span> 下一张 · <span class="kbd">S</span> 发音';
   return hint;
 }
 
@@ -174,25 +301,28 @@ function flip() {
   render();
 }
 
+function showCard(nextIndex, { play = true } = {}) {
+  stopAudio();
+  index = nextIndex;
+  flipped = false;
+  audioError = false;
+  render();
+  if (play && deck.length > 0) playCurrentWord();
+}
+
 function prev() {
   if (index === 0) return;
-  index--;
-  flipped = false;
-  render();
+  showCard(index - 1);
 }
 
 function next() {
   if (index >= deck.length - 1) return;
-  index++;
-  flipped = false;
-  render();
+  showCard(index + 1);
 }
 
 function reshuffle() {
   deck = shuffle(deck);
-  index = 0;
-  flipped = false;
-  render();
+  showCard(0);
 }
 
 function removeCurrent() {
@@ -207,10 +337,10 @@ function removeCurrent() {
       if (typeof LCTFavorites !== 'undefined') {
         LCTFavorites.remove(item.lang, item.query).catch(() => {});
       }
+      stopAudio();
       deck.splice(index, 1);
-      if (index >= deck.length) index = Math.max(0, deck.length - 1);
-      flipped = false;
-      render();
+      const nextIndex = Math.min(index, Math.max(0, deck.length - 1));
+      showCard(nextIndex, { play: deck.length > 0 });
     });
   });
 }
@@ -224,5 +354,8 @@ document.addEventListener('keydown', (e) => {
     prev();
   } else if (e.key === 'ArrowRight') {
     next();
+  } else if (e.key === 's' || e.key === 'S') {
+    e.preventDefault();
+    playCurrentWord();
   }
 });

@@ -5,6 +5,31 @@
 var DEFAULT_API_BASE = 'https://hover.sqw.org.cn';
 // 本地后端调试时可改为 http://localhost:8000
 
+// ---------- 外观主题（popup / content / review 共用） ----------
+// eslint-disable-next-line no-var
+var THEME_MODE_KEY = 'themeMode';
+// eslint-disable-next-line no-var
+var THEME_MODES = ['system', 'light', 'dark'];
+// eslint-disable-next-line no-var
+var DEFAULT_THEME_MODE = 'system';
+
+// eslint-disable-next-line no-unused-vars
+function normalizeThemeMode(mode) {
+  return THEME_MODES.indexOf(mode) !== -1 ? mode : DEFAULT_THEME_MODE;
+}
+
+// 将用户偏好解析为实际生效的 light/dark（system 读 prefers-color-scheme）
+// eslint-disable-next-line no-unused-vars
+function resolveEffectiveTheme(themeMode) {
+  var mode = normalizeThemeMode(themeMode);
+  if (mode === 'light' || mode === 'dark') return mode;
+  try {
+    return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  } catch (e) {
+    return 'light';
+  }
+}
+
 // 从 chrome.storage.sync 读取访问令牌；content / background / popup / review 各上下文通用。
 // eslint-disable-next-line no-unused-vars
 function getAccessToken() {

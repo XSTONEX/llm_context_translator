@@ -249,6 +249,126 @@ class FavoritesStorageTests(unittest.TestCase):
         self.assertEqual(len(storage.list_favorites("default")), 1)
         self.assertEqual(len(storage.list_favorites("alice")), 1)
 
+    def test_get_favorite_and_set_audio_fields(self):
+        storage.upsert_favorite("default", {"query": "Apple", "lang": "en"})
+        got = storage.get_favorite("default", "en", "APPLE")
+        self.assertIsNotNone(got)
+        self.assertEqual(got["query"], "Apple")
+
+        updated = storage.set_favorite_audio(
+            "default", "en", "apple", "tts/default/en/abc.mp3", "alloy"
+        )
+        self.assertEqual(updated["audioKey"], "tts/default/en/abc.mp3")
+        self.assertEqual(updated["audioVoice"], "alloy")
+        again = storage.get_favorite("default", "en", "apple")
+        self.assertEqual(again["audioKey"], "tts/default/en/abc.mp3")
+
+
+class CosAudioKeyTests(unittest.TestCase):
+    def test_audio_object_key_is_stable_and_hash_based(self):
+        from cos_audio import build_audio_key
+
+        k1 = build_audio_key("default", "en", "  Apple ", "alloy")
+        k2 = build_audio_key("default", "en", "apple", "alloy")
+        self.assertEqual(k1, k2)
+        self.assertTrue(k1.startswith("tts/default/en/"))
+        self.assertTrue(k1.endswith(".mp3"))
+        self.assertNotIn("Apple", k1)
+        # 文件名是 hash，不含原文
+        self.assertNotIn("apple", k1.split("/")[-1])
+
+
+class EnsureFavoriteAudioTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+        tmp.close()
+        self.db_path = tmp.name
+        self._orig_path = storage.LCT_DB_PATH
+        storage.LCT_DB_PATH = self.db_path
+        storage.init_db()
+
+    def tearDown(self):
+        storage.LCT_DB_PATH = self._orig_path
+        os.unlink(self.db_path)
+
+    async def test_ensure_uploads_and_writes_audio_key(self):
+        from unittest.mock import AsyncMock, patch
+
+        from app import ensure_favorite_audio
+
+        item = {"query": "hello", "lang": "en"}
+        storage.upsert_favorite("default", item)
+
+        with (
+            patch("app.cos_configured", return_value=True),
+            patch("app.DEERAPI_KEY", "fake-key"),
+            patch("app.download_audio", return_value=None),
+            patch("app.upload_audio") as mock_upload,
+            patch(
+                "app.generate_tts_bytes",
+                new=AsyncMock(return_value=b"fake-mp3"),
+            ),
+        ):
+            result = await ensure_favorite_audio("default", dict(item))
+
+        self.assertTrue(result.get("audioKey", "").endswith(".mp3"))
+        self.assertEqual(result.get("audioVoice"), "alloy")
+        mock_upload.assert_called_once()
+        stored = storage.get_favorite("default", "en", "hello")
+        self.assertEqual(stored.get("audioKey"), result["audioKey"])
+
+    async def test_ensure_skips_when_cos_not_configured(self):
+        from unittest.mock import AsyncMock, patch
+
+        from app import ensure_favorite_audio
+
+        item = {"query": "hello", "lang": "en"}
+        with (
+            patch("app.cos_configured", return_value=False),
+            patch("app.generate_tts_bytes", new=AsyncMock()) as mock_tts,
+        ):
+            result = await ensure_favorite_audio("default", dict(item))
+
+        self.assertNotIn("audioKey", result)
+        mock_tts.assert_not_called()
+
+    async def test_batch_ensure_only_fills_missing_audio(self):
+        from unittest.mock import AsyncMock, patch
+
+        from app import _missing_audio, ensure_favorite_audio
+
+        storage.upsert_favorite(
+            "default",
+            {"query": "has", "lang": "en", "audioKey": "tts/default/en/x.mp3"},
+        )
+        storage.upsert_favorite("default", {"query": "miss", "lang": "en"})
+
+        self.assertFalse(
+            _missing_audio(storage.get_favorite("default", "en", "has"))
+        )
+        self.assertTrue(
+            _missing_audio(storage.get_favorite("default", "en", "miss"))
+        )
+
+        with (
+            patch("app.cos_configured", return_value=True),
+            patch("app.DEERAPI_KEY", "fake-key"),
+            patch("app.download_audio", return_value=None),
+            patch("app.upload_audio"),
+            patch(
+                "app.generate_tts_bytes",
+                new=AsyncMock(return_value=b"fake-mp3"),
+            ) as mock_tts,
+        ):
+            items = storage.list_favorites("default")
+            for item in items:
+                if _missing_audio(item):
+                    await ensure_favorite_audio("default", dict(item))
+
+        self.assertEqual(mock_tts.await_count, 1)
+        miss = storage.get_favorite("default", "en", "miss")
+        self.assertTrue(miss.get("audioKey"))
+
 
 class UserResolutionTests(unittest.TestCase):
     def test_resolve_user_id_is_single_user_for_now(self):

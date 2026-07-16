@@ -1,4 +1,6 @@
+import asyncio
 import json
+import logging
 import re
 import secrets
 import time
@@ -20,11 +22,15 @@ from config import (
     LCT_RATE_LIMIT_WINDOW_SECONDS,
     LLM_API_BASE_URL,
     SILICONFLOW_API_KEY,
+    cos_configured,
 )
 import storage
+from cos_audio import build_audio_key, delete_audio, download_audio, upload_audio
 from json_stream_parser import JsonStreamParser
 from language_strategy import get_strategy
 from models import DEFAULT_MODEL, get_models_response, model_supports_thinking, resolve_model
+
+log = logging.getLogger("lct.app")
 
 # ========== Pydantic 数据模型 ==========
 
@@ -413,18 +419,14 @@ async def translate(req: TranslateRequest):
     return data
 
 
-# ========== TTS 端点 ==========
+# ========== TTS ==========
 
 
-@app.post(
-    "/api/tts",
-    dependencies=[Depends(require_rate_limit), Depends(require_access_token)],
-)
-async def text_to_speech(req: TTSRequest):
-    """调用 DeerAPI 生成语音，返回 audio/mpeg 二进制流"""
+async def generate_tts_bytes(text: str, voice: str = "alloy") -> bytes:
+    """调用 DeerAPI 生成语音二进制；失败抛 HTTPException。"""
     if not DEERAPI_KEY:
         raise HTTPException(status_code=500, detail="DEERAPI_KEY 未配置")
-    if len(req.text) > MAX_TTS_CHARS:
+    if len(text) > MAX_TTS_CHARS:
         raise HTTPException(
             status_code=413, detail=f"TTS 文本过长（上限 {MAX_TTS_CHARS} 字符）"
         )
@@ -436,8 +438,8 @@ async def text_to_speech(req: TTSRequest):
     }
     payload = {
         "model": "gpt-4o-mini-tts",
-        "input": req.text,
-        "voice": req.voice,
+        "input": text,
+        "voice": voice,
     }
 
     try:
@@ -448,14 +450,55 @@ async def text_to_speech(req: TTSRequest):
                     status_code=502,
                     detail=f"TTS API 返回 {resp.status}: {error_text[:200]}",
                 )
-            audio_data = await resp.read()
-            return Response(
-                content=audio_data,
-                media_type="audio/mpeg",
-                headers={"Content-Disposition": "inline"},
-            )
+            return await resp.read()
     except aiohttp.ClientError as e:
         raise HTTPException(status_code=502, detail=f"TTS 服务请求失败: {str(e)}")
+
+
+async def ensure_favorite_audio(
+    user_id: str, item: dict, voice: str = "alloy"
+) -> dict:
+    """保证 item 带 audioKey 并已上传 COS。失败时原样返回，不阻断收藏主路径。"""
+    if not cos_configured() or not DEERAPI_KEY:
+        return item
+
+    query = (item.get("query") or "").strip()
+    if not query:
+        return item
+
+    lang = item.get("lang") or "en"
+    key = item.get("audioKey") or build_audio_key(user_id, lang, query, voice)
+
+    try:
+        existing = await asyncio.to_thread(download_audio, key)
+        if existing:
+            item["audioKey"] = key
+            item["audioVoice"] = voice
+            storage.upsert_favorite(user_id, item)
+            return item
+
+        audio = await generate_tts_bytes(query, voice)
+        await asyncio.to_thread(upload_audio, key, audio)
+        item["audioKey"] = key
+        item["audioVoice"] = voice
+        storage.upsert_favorite(user_id, item)
+    except Exception:
+        log.exception("ensure_favorite_audio failed query=%s", query)
+    return item
+
+
+@app.post(
+    "/api/tts",
+    dependencies=[Depends(require_rate_limit), Depends(require_access_token)],
+)
+async def text_to_speech(req: TTSRequest):
+    """调用 DeerAPI 生成语音，返回 audio/mpeg 二进制流"""
+    audio_data = await generate_tts_bytes(req.text, req.voice)
+    return Response(
+        content=audio_data,
+        media_type="audio/mpeg",
+        headers={"Content-Disposition": "inline"},
+    )
 
 
 # ========== 模型列表端点 ==========
@@ -486,10 +529,55 @@ def get_favorites(user_id: str = Depends(current_user)):
     "/api/favorites",
     dependencies=[Depends(require_rate_limit), Depends(require_access_token)],
 )
-def add_favorite(item: FavoriteItem, user_id: str = Depends(current_user)):
-    """新增/更新一条生词。"""
-    storage.upsert_favorite(user_id, item.model_dump())
-    return {"ok": True}
+async def add_favorite(item: FavoriteItem, user_id: str = Depends(current_user)):
+    """新增/更新一条生词；尽量同步生成并上传发音到 COS。"""
+    data = item.model_dump()
+    storage.upsert_favorite(user_id, data)
+    data = await ensure_favorite_audio(user_id, data)
+    storage.upsert_favorite(user_id, data)
+    return {"ok": True, "favorite": data}
+
+
+@app.get(
+    "/api/favorites/audio",
+    dependencies=[Depends(require_rate_limit), Depends(require_access_token)],
+)
+async def get_favorite_audio(
+    query: str,
+    lang: str = "en",
+    voice: str = "alloy",
+    user_id: str = Depends(current_user),
+):
+    """返回收藏词的 mp3。优先 COS；缺失则懒生成并回填。"""
+    if not query or not query.strip():
+        raise HTTPException(status_code=400, detail="query 不能为空")
+
+    item = storage.get_favorite(user_id, lang, query)
+    if item is None:
+        raise HTTPException(status_code=404, detail="未找到该生词")
+
+    data = None
+    key = item.get("audioKey")
+    if key and cos_configured():
+        data = await asyncio.to_thread(download_audio, key)
+
+    if data is None:
+        item = await ensure_favorite_audio(user_id, item, voice=voice)
+        key = item.get("audioKey")
+        if key and cos_configured():
+            data = await asyncio.to_thread(download_audio, key)
+        if data is None:
+            # COS 未配置或上传失败时，退回即时 TTS（不落盘）
+            data = await generate_tts_bytes(item.get("query") or query, voice)
+
+    return Response(
+        content=data,
+        media_type="audio/mpeg",
+        headers={
+            "Content-Disposition": "inline",
+            "Cache-Control": "private, max-age=86400",
+        },
+    )
 
 
 @app.post(
@@ -498,6 +586,12 @@ def add_favorite(item: FavoriteItem, user_id: str = Depends(current_user)):
 )
 def remove_favorite(req: FavoriteDeleteRequest, user_id: str = Depends(current_user)):
     """删除一条生词（用 POST 而非 DELETE，便于在请求体携带长句子）。"""
+    existing = storage.get_favorite(user_id, req.lang, req.query)
+    if existing and existing.get("audioKey"):
+        try:
+            delete_audio(existing["audioKey"])
+        except Exception:
+            log.exception("cos delete on unfavorite failed")
     storage.delete_favorite(user_id, req.lang, req.query)
     return {"ok": True}
 
@@ -510,6 +604,60 @@ def import_favorites(req: FavoriteBulkRequest, user_id: str = Depends(current_us
     """批量导入（客户端首次同步时把本地已有收藏迁移上来）。"""
     count = storage.bulk_import(user_id, [item.model_dump() for item in req.favorites])
     return {"ok": True, "imported": count}
+
+
+# 单次请求最多补多少条，避免 popup/复习页打开时一次卡死或烧爆 TTS
+MAX_ENSURE_AUDIO_PER_REQUEST = 20
+
+
+def _missing_audio(item: dict) -> bool:
+    return not (item.get("audioKey") or "").strip()
+
+
+@app.post(
+    "/api/favorites/ensure-audio",
+    dependencies=[Depends(require_rate_limit), Depends(require_access_token)],
+)
+async def ensure_favorites_audio(
+    voice: str = "alloy",
+    user_id: str = Depends(current_user),
+):
+    """为缺 audioKey 的生词现场生成 TTS 并上传 COS，写回完整链路。
+
+    打开生词本 / 复习页时由客户端在 list 同步后调用。
+    单次最多处理 MAX_ENSURE_AUDIO_PER_REQUEST 条；remaining>0 时可再调。
+    """
+    items = storage.list_favorites(user_id)
+    missing = [item for item in items if _missing_audio(item)]
+    batch = missing[:MAX_ENSURE_AUDIO_PER_REQUEST]
+
+    filled = 0
+    failed = 0
+    for item in batch:
+        updated = await ensure_favorite_audio(user_id, dict(item), voice=voice)
+        if not _missing_audio(updated):
+            filled += 1
+        else:
+            failed += 1
+
+    final = storage.list_favorites(user_id)
+    remaining = sum(1 for item in final if _missing_audio(item))
+    log.info(
+        "ensure-audio user=%s batch=%s filled=%s failed=%s remaining=%s",
+        user_id,
+        len(batch),
+        filled,
+        failed,
+        remaining,
+    )
+    return {
+        "ok": True,
+        "checked": len(batch),
+        "filled": filled,
+        "failed": failed,
+        "remaining": remaining,
+        "favorites": final,
+    }
 
 
 # ========== 状态检测端点 ==========

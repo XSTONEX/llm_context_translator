@@ -22,8 +22,9 @@
     });
   }
 
-  async function authHeaders() {
-    const headers = { 'Content-Type': 'application/json' };
+  async function authHeaders({ json = false } = {}) {
+    const headers = {};
+    if (json) headers['Content-Type'] = 'application/json';
     const token = (typeof getAccessToken === 'function') ? await getAccessToken() : '';
     if (token) headers['X-LCT-Token'] = token;
     return headers;
@@ -33,7 +34,7 @@
     const apiBase = await getApiBase();
     const res = await fetch(apiBase + path, {
       method,
-      headers: await authHeaders(),
+      headers: await authHeaders({ json: body !== undefined }),
       body: body ? JSON.stringify(body) : undefined
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -73,19 +74,68 @@
     return [item.lang || 'en', (item.query || '').trim().toLowerCase()].join('::');
   }
 
+  function needsAudio(item) {
+    return !(item && item.audioKey && String(item.audioKey).trim());
+  }
+
   const api = {
     list: () => call('GET', '/api/favorites'),
     add: (item) => call('POST', '/api/favorites', item),
     remove: (lang, query) => call('POST', '/api/favorites/delete', { lang, query }),
     bulkImport: (items) => call('POST', '/api/favorites/bulk', { favorites: items }),
+
+    /** 拉取收藏词音频 blob（带鉴权；用于复习页播放）。 */
+    async fetchAudioBlob(lang, query, voice = 'alloy') {
+      const apiBase = await getApiBase();
+      const qs = new URLSearchParams({
+        lang: lang || 'en',
+        query: query || '',
+        voice: voice || 'alloy'
+      });
+      const res = await fetch(apiBase + '/api/favorites/audio?' + qs.toString(), {
+        method: 'GET',
+        headers: await authHeaders()
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.blob();
+    },
+
+    /**
+     * 为缺 audioKey 的生词现场补 TTS→COS→写回。
+     * 后端单次有上限，这里会连调直到 remaining=0 或本轮无进展。
+     */
+    async ensureMissingAudio() {
+      const maxRounds = 10;
+      let last = null;
+      for (let round = 0; round < maxRounds; round++) {
+        last = await call('POST', '/api/favorites/ensure-audio', {});
+        if (last && Array.isArray(last.favorites)) {
+          await setMirror(last.favorites);
+        }
+        const remaining = (last && last.remaining) || 0;
+        const filled = (last && last.filled) || 0;
+        if (remaining === 0) break;
+        if (filled === 0) break; // 无进展（COS/TTS 不可用），避免死循环
+      }
+      return last;
+    },
+
     getMirror,
     setMirror,
 
     // 从后端拉取并与本地镜像合并；首次发现「后端空 + 本地有」则把本地迁移上去。
+    // 同步完成后若有缺音频的词，现场走完整补生成链路。
     async sync({ force = false } = {}) {
       try {
         const syncedAt = await getSyncedAt();
         if (!force && syncedAt && Date.now() - syncedAt < SYNC_TTL_MS) {
+          // TTL 内也尽量给本地镜像里缺音频的词补一次（打开生词本场景）
+          const localQuick = await getMirror();
+          if (localQuick.some(needsAudio)) {
+            await api.ensureMissingAudio().catch((err) => {
+              console.warn('[LCT] ensure audio failed:', err && err.message);
+            });
+          }
           return;
         }
         const data = await api.list();
@@ -93,7 +143,24 @@
         const local = await getMirror();
         if (remote.length === 0 && local.length > 0) {
           await api.bulkImport(local); // 迁移：保留本地镜像，同时写入后端
+          // 迁移后尽量用服务端列表；若仍为空（延迟/失败）绝不能用 [] 覆盖本地
+          // （JS 里 [] 为 truthy，不能写 favorites || local）
+          let next = local;
+          try {
+            const after = await api.list();
+            if (after && Array.isArray(after.favorites) && after.favorites.length > 0) {
+              next = after.favorites;
+            }
+          } catch (_) {
+            /* 保留 local */
+          }
+          await setMirror(next);
           await markSynced();
+          if (next.some(needsAudio)) {
+            await api.ensureMissingAudio().catch((err) => {
+              console.warn('[LCT] ensure audio failed:', err && err.message);
+            });
+          }
           return;
         }
         // 本地独有条目：上次同步之后才收藏的视为「离线新增」，补推后端并保留；
@@ -105,8 +172,31 @@
             (!syncedAt || (item.timestamp || 0) > syncedAt)
         );
         if (pendingAdds.length > 0) await api.bulkImport(pendingAdds);
-        await setMirror([...pendingAdds, ...remote]);
+
+        // 以远端为准，但 bulk 后若 list 尚未含离线新增，仍保留 pendingAdds
+        let merged = [...pendingAdds, ...remote];
+        if (pendingAdds.length > 0) {
+          try {
+            const refreshed = await api.list();
+            if (refreshed && Array.isArray(refreshed.favorites) && refreshed.favorites.length > 0) {
+              const refreshedKeys = new Set(refreshed.favorites.map(lookupKey));
+              const stillPending = pendingAdds.filter(
+                (item) => !refreshedKeys.has(lookupKey(item))
+              );
+              merged = [...stillPending, ...refreshed.favorites];
+            }
+          } catch (_) {
+            /* 用合并结果兜底 */
+          }
+        }
+        await setMirror(merged);
         await markSynced();
+
+        if (merged.some(needsAudio)) {
+          await api.ensureMissingAudio().catch((err) => {
+            console.warn('[LCT] ensure audio failed:', err && err.message);
+          });
+        }
       } catch (err) {
         // 离线/后端不可达：保留本地镜像，下次再同步
         console.warn('[LCT] favorites sync failed:', err && err.message);

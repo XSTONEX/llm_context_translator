@@ -6,7 +6,7 @@
 
 /* ========== CSS 变量系统 ========== */
 :host {
-  /* 颜色 */
+  /* 颜色（浅色默认） */
   --lct-bg: #FFFFFF;
   --lct-bg-secondary: #F6F7F9;
   --lct-text-primary: #1A1A1A;
@@ -14,11 +14,22 @@
   --lct-text-tertiary: #9CA3AF;
   --lct-border: #E5E7EB;
   --lct-accent: #3B82F6;
+  --lct-accent-soft: rgba(59, 130, 246, 0.08);
   --lct-highlight-pink: #E11D48;
   --lct-icon-default: #9CA3AF;
   --lct-icon-hover-bg: #F3F4F6;
   --lct-pin-active: #3B82F6;
   --lct-copied-color: #10B981;
+  --lct-chip-text: #2563EB;
+  --lct-chip-bg: #EFF6FF;
+  --lct-error-bg: #FEF2F2;
+  --lct-error-border: #FECACA;
+  --lct-error-title: #991B1B;
+  --lct-error-text: #7F1D1D;
+  --lct-error-meta: #B91C1C;
+  --lct-error-btn: #DC2626;
+  --lct-error-btn-secondary-bg: #FFFFFF;
+  --lct-error-btn-secondary-border: #FCA5A5;
 
   /* 阴影 */
   --lct-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05),
@@ -46,6 +57,35 @@
 
   /* 动画 */
   --lct-transition: 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 深色主题：由 content-panel 在 host 上设置 data-theme="dark" */
+:host([data-theme="dark"]) {
+  --lct-bg: #1C1C1E;
+  --lct-bg-secondary: #2C2C2E;
+  --lct-text-primary: #F5F5F7;
+  --lct-text-secondary: #A1A1AA;
+  --lct-text-tertiary: #71717A;
+  --lct-border: #3A3A3C;
+  --lct-accent: #60A5FA;
+  --lct-accent-soft: rgba(96, 165, 250, 0.15);
+  --lct-highlight-pink: #FB7185;
+  --lct-icon-default: #8E8E93;
+  --lct-icon-hover-bg: #3A3A3C;
+  --lct-pin-active: #60A5FA;
+  --lct-copied-color: #34D399;
+  --lct-chip-text: #93C5FD;
+  --lct-chip-bg: rgba(59, 130, 246, 0.18);
+  --lct-error-bg: rgba(127, 29, 29, 0.35);
+  --lct-error-border: #7F1D1D;
+  --lct-error-title: #FCA5A5;
+  --lct-error-text: #FECACA;
+  --lct-error-meta: #F87171;
+  --lct-error-btn: #EF4444;
+  --lct-error-btn-secondary-bg: #2C2C2E;
+  --lct-error-btn-secondary-border: #7F1D1D;
+  --lct-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4),
+                0 10px 30px -5px rgba(0, 0, 0, 0.5);
 }
 
 /* ========== 面板基础 ========== */
@@ -162,7 +202,7 @@
 }
 .lct-icon-btn.lct-active {
   color: var(--lct-pin-active);
-  background: rgba(59, 130, 246, 0.08);
+  background: var(--lct-accent-soft);
 }
 .lct-icon-btn[data-action="favorite"].lct-active {
   color: #F59E0B;
@@ -221,8 +261,8 @@
 
 .lct-dictionary-form {
   font-size: var(--lct-font-size-sm);
-  color: #2563EB;
-  background: #EFF6FF;
+  color: var(--lct-chip-text);
+  background: var(--lct-chip-bg);
   border-radius: 6px;
   padding: 4px 10px;
   margin: 0 16px 4px;
@@ -291,7 +331,7 @@
   font-size: var(--lct-font-size-xs);
   color: var(--lct-accent);
   font-weight: 600;
-  background: rgba(59, 130, 246, 0.08);
+  background: var(--lct-accent-soft);
   padding: 1px 7px;
   border-radius: 4px;
   white-space: nowrap;
@@ -773,7 +813,7 @@
   font-size: var(--lct-font-size-xs);
   font-weight: 600;
   color: var(--lct-accent);
-  background: rgba(59, 130, 246, 0.08);
+  background: var(--lct-accent-soft);
   padding: 2px 8px;
   border-radius: 4px;
   white-space: nowrap;
@@ -810,27 +850,27 @@
 .lct-error-card {
   margin: var(--lct-padding);
   padding: var(--lct-padding-sm);
-  background: #FEF2F2;
-  border: 1px solid #FECACA;
+  background: var(--lct-error-bg);
+  border: 1px solid var(--lct-error-border);
   border-radius: var(--lct-radius-sm);
 }
 
 .lct-error-title {
   font-size: var(--lct-font-size-md);
   font-weight: 700;
-  color: #991B1B;
+  color: var(--lct-error-title);
   margin-bottom: 4px;
 }
 
 .lct-error-message {
   font-size: var(--lct-font-size-sm);
-  color: #7F1D1D;
+  color: var(--lct-error-text);
   line-height: 1.6;
 }
 
 .lct-error-meta {
   font-size: var(--lct-font-size-xs);
-  color: #B91C1C;
+  color: var(--lct-error-meta);
   margin-top: 8px;
   word-break: break-all;
 }
@@ -847,16 +887,16 @@
   height: 28px;
   padding: 0 10px;
   border-radius: var(--lct-radius-xs);
-  background: #DC2626;
+  background: var(--lct-error-btn);
   color: #fff;
   font-size: var(--lct-font-size-xs);
   font-weight: 600;
 }
 
 .lct-text-btn-secondary {
-  background: #fff;
-  color: #991B1B;
-  border: 1px solid #FCA5A5;
+  background: var(--lct-error-btn-secondary-bg);
+  color: var(--lct-error-title);
+  border: 1px solid var(--lct-error-btn-secondary-border);
 }
 
 /* ========== Toast 通知 ========== */

@@ -9,12 +9,28 @@ const HISTORY_LIMIT = 50;
 
 document.addEventListener('DOMContentLoaded', init);
 
+function applyDocumentTheme(themeMode) {
+  const resolve =
+    typeof resolveEffectiveTheme === 'function'
+      ? resolveEffectiveTheme
+      : (mode) => {
+          if (mode === 'light' || mode === 'dark') return mode;
+          try {
+            return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          } catch (e) {
+            return 'light';
+          }
+        };
+  document.documentElement.dataset.theme = resolve(themeMode);
+}
+
 function init() {
   const els = {
     statusDot: document.getElementById('statusDot'),
     enableToggle: document.getElementById('enableToggle'),
     langSelect: document.getElementById('langSelect'),
     ttsPlayModeSelect: document.getElementById('ttsPlayModeSelect'),
+    themeSelect: document.getElementById('themeSelect'),
     apiBaseInput: document.getElementById('apiBaseInput'),
     tokenInput: document.getElementById('tokenInput'),
     modelInfo: document.getElementById('modelInfo'),
@@ -29,6 +45,19 @@ function init() {
 
   const toggleSwitch = els.enableToggle.closest('.toggle-switch');
   toggleSwitch.classList.add('no-transition');
+
+  let themeMode = typeof DEFAULT_THEME_MODE !== 'undefined' ? DEFAULT_THEME_MODE : 'system';
+  const themeKey = typeof THEME_MODE_KEY !== 'undefined' ? THEME_MODE_KEY : 'themeMode';
+
+  function setThemeMode(mode) {
+    const normalize =
+      typeof normalizeThemeMode === 'function'
+        ? normalizeThemeMode
+        : (m) => (m === 'light' || m === 'dark' || m === 'system' ? m : 'system');
+    themeMode = normalize(mode);
+    if (els.themeSelect) els.themeSelect.value = themeMode;
+    applyDocumentTheme(themeMode);
+  }
 
   // 访问令牌存在 chrome.storage.sync（随 Chrome 账号跨设备同步）
   chrome.storage.sync.get(['accessToken'], (result) => {
@@ -53,7 +82,7 @@ function init() {
   });
 
   chrome.storage.local.get(
-    ['enabled', 'apiBase', 'selectedModel', 'sourceLangMode', 'targetLang', 'ttsPlayMode', 'lookupHistory', 'favoriteLookups'],
+    ['enabled', 'apiBase', 'selectedModel', 'sourceLangMode', 'targetLang', 'ttsPlayMode', themeKey, 'lookupHistory', 'favoriteLookups'],
     (result) => {
       const enabled = result.enabled !== undefined ? result.enabled : true;
       const apiBase = result.apiBase || DEFAULT_API_BASE;
@@ -64,6 +93,7 @@ function init() {
       els.apiBaseInput.value = apiBase;
       els.langSelect.value = sourceLangMode;
       els.ttsPlayModeSelect.value = result.ttsPlayMode || 'off';
+      setThemeMode(result[themeKey]);
 
       toggleSwitch.offsetHeight;
       toggleSwitch.classList.remove('no-transition');
@@ -86,6 +116,32 @@ function init() {
   els.ttsPlayModeSelect.addEventListener('change', () => {
     chrome.storage.local.set({ ttsPlayMode: els.ttsPlayModeSelect.value });
   });
+
+  if (els.themeSelect) {
+    els.themeSelect.addEventListener('change', () => {
+      const mode =
+        typeof normalizeThemeMode === 'function'
+          ? normalizeThemeMode(els.themeSelect.value)
+          : els.themeSelect.value;
+      themeMode = mode;
+      applyDocumentTheme(themeMode);
+      chrome.storage.local.set({ [themeKey]: themeMode });
+    });
+  }
+
+  try {
+    const mediaQuery = matchMedia('(prefers-color-scheme: dark)');
+    const onSystemThemeChange = () => {
+      if (themeMode === 'system') applyDocumentTheme('system');
+    };
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', onSystemThemeChange);
+    } else if (mediaQuery.addListener) {
+      mediaQuery.addListener(onSystemThemeChange);
+    }
+  } catch (e) {
+    // matchMedia 不可用时忽略
+  }
 
   els.enableToggle.addEventListener('change', () => {
     const enabled = els.enableToggle.checked;
@@ -146,6 +202,9 @@ function init() {
     }
     if (changes.enabled) {
       els.enableToggle.checked = changes.enabled.newValue !== undefined ? changes.enabled.newValue : true;
+    }
+    if (changes[themeKey]) {
+      setThemeMode(changes[themeKey].newValue);
     }
   });
 }

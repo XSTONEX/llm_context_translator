@@ -15,6 +15,9 @@
   let panelElement = null;
   let toastElement = null;
   let toastTimer = null;
+  let themeMode = typeof DEFAULT_THEME_MODE !== 'undefined' ? DEFAULT_THEME_MODE : 'system';
+  let themeMediaQuery = null;
+  let themeListenersBound = false;
 
   function getPanel() {
     return panelElement;
@@ -26,6 +29,72 @@
 
   function getShadowRoot() {
     return shadowRoot;
+  }
+
+  function applyThemeToHost() {
+    if (!hostElement) return;
+    const resolve =
+      typeof resolveEffectiveTheme === 'function'
+        ? resolveEffectiveTheme
+        : (mode) => (mode === 'dark' ? 'dark' : 'light');
+    hostElement.dataset.theme = resolve(themeMode);
+  }
+
+  function loadAndApplyTheme() {
+    const key = typeof THEME_MODE_KEY !== 'undefined' ? THEME_MODE_KEY : 'themeMode';
+    return new Promise((resolve) => {
+      try {
+        chrome.storage.local.get([key], (result) => {
+          const normalize =
+            typeof normalizeThemeMode === 'function'
+              ? normalizeThemeMode
+              : (mode) => (mode === 'light' || mode === 'dark' || mode === 'system' ? mode : 'system');
+          themeMode = normalize(result[key]);
+          applyThemeToHost();
+          resolve(themeMode);
+        });
+      } catch (e) {
+        applyThemeToHost();
+        resolve(themeMode);
+      }
+    });
+  }
+
+  function onSystemThemeChange() {
+    if (themeMode !== 'system') return;
+    applyThemeToHost();
+  }
+
+  function bindThemeListeners() {
+    if (themeListenersBound) return;
+    themeListenersBound = true;
+
+    try {
+      chrome.storage.onChanged.addListener((changes, area) => {
+        if (area !== 'local') return;
+        const key = typeof THEME_MODE_KEY !== 'undefined' ? THEME_MODE_KEY : 'themeMode';
+        if (!changes[key]) return;
+        const normalize =
+          typeof normalizeThemeMode === 'function'
+            ? normalizeThemeMode
+            : (mode) => (mode === 'light' || mode === 'dark' || mode === 'system' ? mode : 'system');
+        themeMode = normalize(changes[key].newValue);
+        applyThemeToHost();
+      });
+    } catch (e) {
+      // storage API 在部分测试环境可能不可用
+    }
+
+    try {
+      themeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      if (themeMediaQuery.addEventListener) {
+        themeMediaQuery.addEventListener('change', onSystemThemeChange);
+      } else if (themeMediaQuery.addListener) {
+        themeMediaQuery.addListener(onSystemThemeChange);
+      }
+    } catch (e) {
+      // matchMedia 不可用时忽略
+    }
   }
 
   function initShadowDOM() {
@@ -46,6 +115,9 @@
     state.panelEventsBound = false;
     state.dragEventsBound = false;
 
+    applyThemeToHost();
+    loadAndApplyTheme();
+    bindThemeListeners();
     loadStyles();
   }
 

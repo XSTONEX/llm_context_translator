@@ -20,3 +20,15 @@ DEERAPI_BASE_URL: str = os.getenv("DEERAPI_BASE_URL", "https://api.deerapi.com/v
 LCT_DB_PATH: str = os.getenv(
     "LCT_DB_PATH", str(Path(__file__).parent / "data" / "favorites.db")
 )
+
+# 腾讯云 COS（收藏单词音频，可选）
+COS_SECRET_ID: str = os.getenv("COS_SECRET_ID", "")
+COS_SECRET_KEY: str = os.getenv("COS_SECRET_KEY", "")
+COS_BUCKET: str = os.getenv("COS_BUCKET", "")
+COS_REGION: str = os.getenv("COS_REGION", "ap-guangzhou")
+COS_PREFIX: str = os.getenv("COS_PREFIX", "tts")
+
+
+def cos_configured() -> bool:
+    """四项齐全才视为已启用 COS。"""
+    return bool(COS_SECRET_ID and COS_SECRET_KEY and COS_BUCKET and COS_REGION)
