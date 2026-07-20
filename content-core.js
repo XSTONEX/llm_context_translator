@@ -220,30 +220,30 @@
       const next = exists
         ? favorites.filter((entry) => getLookupKey(entry) !== key)
         : [item, ...favorites];
-      // 先乐观更新本地镜像（面板即时响应、离线可用）
+      // 先写本地镜像并立即返回，保证面板星标/toast 不依赖网络
       await setStorage({ favoriteLookups: next });
-      // 再尽力推送到后端（失败不影响本地，下次同步以后端为准）
+
+      // 后台推后端（失败不影响本地；下次 sync 以后端为准）
       if (globalThis.LCTFavorites) {
-        try {
+        const syncBackend = async () => {
           if (exists) {
             await globalThis.LCTFavorites.remove(request.lang, data.query);
-          } else {
-            // 后端 add 可能已生成 audioKey；写回本地镜像，避免下次打开再全量补音频
-            const res = await globalThis.LCTFavorites.add(item);
-            const saved = res && res.favorite;
-            if (saved && saved.audioKey) {
-              const mirror = await getStorage(['favoriteLookups']);
-              const list = Array.isArray(mirror.favoriteLookups) ? mirror.favoriteLookups : [];
-              const idx = list.findIndex((entry) => getLookupKey(entry) === key);
-              if (idx >= 0) {
-                list[idx] = { ...list[idx], ...saved };
-                await setStorage({ favoriteLookups: list });
-              }
-            }
+            return;
           }
-        } catch (err) {
+          // 若后端返回 audioKey，写回本地；用户期间已取消则跳过
+          const res = await globalThis.LCTFavorites.add(item);
+          const saved = res && res.favorite;
+          if (!saved || !saved.audioKey) return;
+          const mirror = await getStorage(['favoriteLookups']);
+          const list = Array.isArray(mirror.favoriteLookups) ? mirror.favoriteLookups : [];
+          const idx = list.findIndex((entry) => getLookupKey(entry) === key);
+          if (idx < 0) return;
+          list[idx] = { ...list[idx], ...saved };
+          await setStorage({ favoriteLookups: list });
+        };
+        syncBackend().catch((err) => {
           console.warn('[LCT] favorite backend sync failed:', err && err.message);
-        }
+        });
       }
       return !exists;
     }
