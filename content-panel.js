@@ -1335,9 +1335,17 @@
       showToast('暂无可收藏内容');
       return;
     }
-    const isFavorite = await LCT.storage.toggleFavorite(data, request);
-    btn.classList.toggle('lct-active', isFavorite);
-    showToast(isFavorite ? '已收藏' : '已取消收藏');
+    // 防连点：本地 storage 异步间隙内忽略重复点击
+    if (btn.dataset.busy === '1') return;
+    btn.dataset.busy = '1';
+    try {
+      // toggleFavorite 只等本地写入，后端在后台同步，UI 即时反馈
+      const isFavorite = await LCT.storage.toggleFavorite(data, request);
+      btn.classList.toggle('lct-active', isFavorite);
+      showToast(isFavorite ? '已收藏' : '已取消收藏');
+    } finally {
+      btn.dataset.busy = '0';
+    }
   }
 
   async function syncFavoriteButton(data, request) {

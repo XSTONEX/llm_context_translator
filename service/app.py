@@ -529,11 +529,13 @@ def get_favorites(user_id: str = Depends(current_user)):
     "/api/favorites",
     dependencies=[Depends(require_rate_limit), Depends(require_access_token)],
 )
-async def add_favorite(item: FavoriteItem, user_id: str = Depends(current_user)):
-    """新增/更新一条生词；尽量同步生成并上传发音到 COS。"""
+def add_favorite(item: FavoriteItem, user_id: str = Depends(current_user)):
+    """新增/更新一条生词。
+
+    不在此处同步生成 TTS：发音由 /api/favorites/ensure-audio（打开生词本）
+    或 /api/favorites/audio（播放时懒生成）补全，避免收藏接口被 TTS/COS 拖慢。
+    """
     data = item.model_dump()
-    storage.upsert_favorite(user_id, data)
-    data = await ensure_favorite_audio(user_id, data)
     storage.upsert_favorite(user_id, data)
     return {"ok": True, "favorite": data}
 
