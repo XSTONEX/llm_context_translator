@@ -3,11 +3,13 @@ import os
 import tempfile
 from collections import deque
 import unittest
+from unittest.mock import patch
 
 import storage
 from app import (
     build_chat_payload,
     check_rate_limit,
+    deerapi_request_kwargs,
     ensure_done_event_fields,
     require_access_token,
     resolve_user_id,
@@ -368,6 +370,19 @@ class EnsureFavoriteAudioTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(mock_tts.await_count, 1)
         miss = storage.get_favorite("default", "en", "miss")
         self.assertTrue(miss.get("audioKey"))
+
+
+class DeerapiProxyTests(unittest.TestCase):
+    def test_no_proxy_by_default(self):
+        with patch("app.DEERAPI_HTTP_PROXY", ""):
+            self.assertEqual(deerapi_request_kwargs(), {})
+
+    def test_proxy_only_attached_when_configured(self):
+        with patch("app.DEERAPI_HTTP_PROXY", "http://127.0.0.1:7890"):
+            self.assertEqual(
+                deerapi_request_kwargs(),
+                {"proxy": "http://127.0.0.1:7890"},
+            )
 
 
 class UserResolutionTests(unittest.TestCase):

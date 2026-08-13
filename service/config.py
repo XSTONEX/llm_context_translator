@@ -15,6 +15,8 @@ WORD_COUNT_THRESHOLD: int = int(os.getenv("WORD_COUNT_THRESHOLD", "3"))
 
 DEERAPI_KEY: str = os.getenv("DEERAPI_KEY", "")
 DEERAPI_BASE_URL: str = os.getenv("DEERAPI_BASE_URL", "https://api.deerapi.com/v1")
+# DeerAPI 按地区封禁国内机房 IP。阿里云等环境需走本机 HTTP 代理（如 mihomo :7890）。
+DEERAPI_HTTP_PROXY: str = os.getenv("DEERAPI_HTTP_PROXY", "")
 
 # 生词本 SQLite 数据库路径（默认放在 service/data/ 下，已被 .gitignore 忽略）
 LCT_DB_PATH: str = os.getenv(

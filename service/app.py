@@ -16,6 +16,7 @@ from pydantic import BaseModel
 
 from config import (
     DEERAPI_BASE_URL,
+    DEERAPI_HTTP_PROXY,
     DEERAPI_KEY,
     LCT_ACCESS_TOKEN,
     LCT_RATE_LIMIT_REQUESTS,
@@ -422,6 +423,13 @@ async def translate(req: TranslateRequest):
 # ========== TTS ==========
 
 
+def deerapi_request_kwargs() -> dict:
+    """仅给 DeerAPI 请求附加代理。国内机房直连会被按地区 403。"""
+    if DEERAPI_HTTP_PROXY:
+        return {"proxy": DEERAPI_HTTP_PROXY}
+    return {}
+
+
 async def generate_tts_bytes(text: str, voice: str = "alloy") -> bytes:
     """调用 DeerAPI 生成语音二进制；失败抛 HTTPException。"""
     if not DEERAPI_KEY:
@@ -443,7 +451,9 @@ async def generate_tts_bytes(text: str, voice: str = "alloy") -> bytes:
     }
 
     try:
-        async with app.state.session.post(url, json=payload, headers=headers) as resp:
+        async with app.state.session.post(
+            url, json=payload, headers=headers, **deerapi_request_kwargs()
+        ) as resp:
             if resp.status != 200:
                 error_text = await resp.text()
                 raise HTTPException(
