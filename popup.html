@@ -390,6 +390,85 @@
       font-size: 12px;
       padding: 8px 0;
     }
+
+    .section-hint {
+      font-size: 11px;
+      color: var(--text-faint);
+      margin: -2px 0 8px;
+    }
+
+    .copy-field-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .copy-field-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      height: 32px;
+      padding: 0 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: grab;
+      user-select: none;
+    }
+
+    .copy-field-row.is-dragging {
+      opacity: 0.4;
+    }
+
+    .copy-field-row.is-drag-over {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-soft);
+    }
+
+    .copy-field-handle {
+      display: grid;
+      grid-template-columns: 3px 3px;
+      gap: 2px;
+      width: 8px;
+      flex-shrink: 0;
+    }
+
+    .copy-field-handle i {
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: var(--text-faint);
+    }
+
+    .copy-field-label {
+      flex: 1;
+      min-width: 0;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .copy-field-check {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      margin: 0;
+      border: 1.5px solid var(--border);
+      border-radius: 4px;
+      background: var(--surface-btn);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .copy-field-check:checked {
+      background-color: var(--accent);
+      border-color: var(--accent);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: 10px;
+    }
   </style>
   <script>
     // 尽早应用主题，减少 popup 打开时的闪白/闪黑
@@ -451,6 +530,12 @@
           <option value="light">浅色</option>
           <option value="dark">深色</option>
         </select>
+      </div>
+
+      <div class="copy-block">
+        <div class="section-title">复制内容</div>
+        <div class="section-hint">拖动调整顺序，勾选要复制的项</div>
+        <div class="copy-field-list" id="copyFieldList"></div>
       </div>
 
       <div class="control-row">

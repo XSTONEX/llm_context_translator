@@ -21,3 +21,6 @@ wheels/
 # OS
 .DS_Store
 Thumbs.db
+
+# Brainstorm mockups
+.superpowers/

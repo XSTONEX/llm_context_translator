@@ -41,6 +41,7 @@ function init() {
     historyList: document.getElementById('historyList'),
     reviewButton: document.getElementById('reviewButton'),
     exportButton: document.getElementById('exportButton'),
+    copyFieldList: document.getElementById('copyFieldList'),
   };
 
   const toggleSwitch = els.enableToggle.closest('.toggle-switch');
@@ -105,6 +106,8 @@ function init() {
       renderLookupList(els.favoritesList, result.favoriteLookups || [], { removable: true });
     },
   );
+
+  bindCopyFieldList(els.copyFieldList);
 
   els.langSelect.addEventListener('change', () => {
     chrome.storage.local.set({
@@ -206,6 +209,110 @@ function init() {
     if (changes[themeKey]) {
       setThemeMode(changes[themeKey].newValue);
     }
+  });
+}
+
+function bindCopyFieldList(listEl) {
+  if (!listEl) return;
+
+  const storageKey = typeof COPY_WORD_FIELDS_KEY !== 'undefined' ? COPY_WORD_FIELDS_KEY : 'copyWordFields';
+  const labels =
+    typeof COPY_WORD_FIELD_LABELS !== 'undefined'
+      ? COPY_WORD_FIELD_LABELS
+      : { word: '单词', phonetic: '音标', definition: '释义' };
+
+  let fields =
+    typeof getDefaultCopyWordFields === 'function'
+      ? getDefaultCopyWordFields()
+      : [
+          { key: 'word', enabled: false },
+          { key: 'phonetic', enabled: false },
+          { key: 'definition', enabled: true },
+        ];
+  let dragFrom = -1;
+
+  function normalize(value) {
+    if (typeof normalizeCopyWordFields === 'function') return normalizeCopyWordFields(value);
+    return fields;
+  }
+
+  function save() {
+    chrome.storage.local.set({ [storageKey]: fields });
+  }
+
+  function render() {
+    listEl.innerHTML = '';
+    fields.forEach((field, index) => {
+      const row = document.createElement('div');
+      row.className = 'copy-field-row';
+      row.draggable = true;
+      row.dataset.index = String(index);
+
+      const handle = document.createElement('span');
+      handle.className = 'copy-field-handle';
+      handle.setAttribute('aria-hidden', 'true');
+      for (let i = 0; i < 6; i++) {
+        handle.appendChild(document.createElement('i'));
+      }
+
+      const label = document.createElement('span');
+      label.className = 'copy-field-label';
+      label.textContent = labels[field.key] || field.key;
+
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'copy-field-check';
+      checkbox.checked = Boolean(field.enabled);
+      checkbox.title = field.enabled ? '取消复制此项' : '复制此项';
+      checkbox.addEventListener('mousedown', (e) => e.stopPropagation());
+      checkbox.addEventListener('click', (e) => e.stopPropagation());
+      checkbox.addEventListener('change', () => {
+        fields[index].enabled = checkbox.checked;
+        save();
+      });
+
+      row.appendChild(handle);
+      row.appendChild(label);
+      row.appendChild(checkbox);
+
+      row.addEventListener('dragstart', (e) => {
+        if (e.target === checkbox) {
+          e.preventDefault();
+          return;
+        }
+        dragFrom = index;
+        row.classList.add('is-dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', String(index));
+      });
+      row.addEventListener('dragend', () => {
+        dragFrom = -1;
+        row.classList.remove('is-dragging');
+        listEl.querySelectorAll('.is-drag-over').forEach((el) => el.classList.remove('is-drag-over'));
+      });
+      row.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        listEl.querySelectorAll('.is-drag-over').forEach((el) => el.classList.remove('is-drag-over'));
+        if (Number(row.dataset.index) !== dragFrom) row.classList.add('is-drag-over');
+      });
+      row.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const to = Number(row.dataset.index);
+        if (dragFrom < 0 || Number.isNaN(to) || to === dragFrom) return;
+        const [moved] = fields.splice(dragFrom, 1);
+        fields.splice(to, 0, moved);
+        save();
+        render();
+      });
+
+      listEl.appendChild(row);
+    });
+  }
+
+  chrome.storage.local.get([storageKey], (result) => {
+    fields = normalize(result[storageKey]);
+    render();
   });
 }
 

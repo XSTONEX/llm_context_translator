@@ -18,6 +18,13 @@
   let themeMode = typeof DEFAULT_THEME_MODE !== 'undefined' ? DEFAULT_THEME_MODE : 'system';
   let themeMediaQuery = null;
   let themeListenersBound = false;
+  let copyWordFields = typeof getDefaultCopyWordFields === 'function'
+    ? getDefaultCopyWordFields()
+    : [
+        { key: 'word', enabled: false },
+        { key: 'phonetic', enabled: false },
+        { key: 'definition', enabled: true }
+      ];
 
   function getPanel() {
     return panelElement;
@@ -73,13 +80,18 @@
       chrome.storage.onChanged.addListener((changes, area) => {
         if (area !== 'local') return;
         const key = typeof THEME_MODE_KEY !== 'undefined' ? THEME_MODE_KEY : 'themeMode';
-        if (!changes[key]) return;
-        const normalize =
-          typeof normalizeThemeMode === 'function'
-            ? normalizeThemeMode
-            : (mode) => (mode === 'light' || mode === 'dark' || mode === 'system' ? mode : 'system');
-        themeMode = normalize(changes[key].newValue);
-        applyThemeToHost();
+        if (changes[key]) {
+          const normalize =
+            typeof normalizeThemeMode === 'function'
+              ? normalizeThemeMode
+              : (mode) => (mode === 'light' || mode === 'dark' || mode === 'system' ? mode : 'system');
+          themeMode = normalize(changes[key].newValue);
+          applyThemeToHost();
+        }
+        const copyKey = typeof COPY_WORD_FIELDS_KEY !== 'undefined' ? COPY_WORD_FIELDS_KEY : 'copyWordFields';
+        if (changes[copyKey]) {
+          applyCopyWordFields(changes[copyKey].newValue);
+        }
       });
     } catch (e) {
       // storage API 在部分测试环境可能不可用
@@ -117,8 +129,32 @@
 
     applyThemeToHost();
     loadAndApplyTheme();
+    loadCopyWordFields();
     bindThemeListeners();
     loadStyles();
+  }
+
+  function applyCopyWordFields(value) {
+    copyWordFields = typeof normalizeCopyWordFields === 'function'
+      ? normalizeCopyWordFields(value)
+      : copyWordFields;
+    if (state.currentResponseData) {
+      setCopyButtonReady(Boolean(getCopyableText(state.currentResponseData)));
+    }
+  }
+
+  function loadCopyWordFields() {
+    const copyKey = typeof COPY_WORD_FIELDS_KEY !== 'undefined' ? COPY_WORD_FIELDS_KEY : 'copyWordFields';
+    return new Promise((resolve) => {
+      try {
+        chrome.storage.local.get([copyKey], (result) => {
+          applyCopyWordFields(result[copyKey]);
+          resolve(copyWordFields);
+        });
+      } catch (e) {
+        resolve(copyWordFields);
+      }
+    });
   }
 
   async function loadStyles() {
@@ -1301,8 +1337,11 @@
     }, 1500);
   }
 
-  // 提取「真正的中文意思」：单词取释义，句子取整句翻译，再退到核心翻译；都没有则返回空串
+  // 单词按 popup 里的勾选和顺序拼行;句子仍只复制译文
   function getCopyableText(data) {
+    if (typeof formatCopyableText === 'function') {
+      return formatCopyableText(data, copyWordFields);
+    }
     if (!data) return '';
     if (data.isWord && data.definitions && data.definitions.length > 0) {
       return data.definitions.map((def) => `${def.partOfSpeech} ${def.meaning}`).join('\n');

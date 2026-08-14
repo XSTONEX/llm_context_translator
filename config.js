@@ -30,6 +30,95 @@ function resolveEffectiveTheme(themeMode) {
   }
 }
 
+// ---------- 单词复制字段（popup 配置，content 面板工具栏复制读取） ----------
+// eslint-disable-next-line no-var
+var COPY_WORD_FIELDS_KEY = 'copyWordFields';
+// eslint-disable-next-line no-var
+var COPY_WORD_FIELD_LABELS = {
+  word: '单词',
+  phonetic: '音标',
+  definition: '释义'
+};
+
+// eslint-disable-next-line no-unused-vars
+function getDefaultCopyWordFields() {
+  return [
+    { key: 'word', enabled: false },
+    { key: 'phonetic', enabled: false },
+    { key: 'definition', enabled: true }
+  ];
+}
+
+// 保留用户顺序;未知 key 丢掉;缺的项按默认补上
+// eslint-disable-next-line no-unused-vars
+function normalizeCopyWordFields(value) {
+  var allowed = { word: true, phonetic: true, definition: true };
+  var seen = {};
+  var out = [];
+  if (Array.isArray(value)) {
+    for (var i = 0; i < value.length; i++) {
+      var item = value[i];
+      if (!item || !allowed[item.key] || seen[item.key]) continue;
+      seen[item.key] = true;
+      out.push({ key: item.key, enabled: Boolean(item.enabled) });
+    }
+  }
+  var defaults = getDefaultCopyWordFields();
+  for (var j = 0; j < defaults.length; j++) {
+    if (!seen[defaults[j].key]) {
+      out.push({ key: defaults[j].key, enabled: defaults[j].enabled });
+    }
+  }
+  return out;
+}
+
+function extractWordCopyField(data, key) {
+  if (!data) return '';
+  if (key === 'word') return String(data.query || '').trim();
+  if (key === 'phonetic') {
+    var reading = [];
+    if (data.kana) reading.push(data.kana);
+    if (data.romaji) reading.push(data.romaji);
+    if (reading.length) return reading.join(' ');
+    return String(data.phonetic || '').trim();
+  }
+  if (key === 'definition') {
+    var defs = data.definitions;
+    if (!defs || !defs.length) return '';
+    return defs
+      .map(function (def) {
+        if (!def) return '';
+        var pos = def.partOfSpeech ? def.partOfSpeech + ' ' : '';
+        return (pos + (def.meaning || '')).trim();
+      })
+      .filter(Boolean)
+      .join('\n');
+  }
+  return '';
+}
+
+// 单词按配置拼行;句子仍只出译文;勾选项都空时回退到释义,避免复制按钮变成空操作
+// eslint-disable-next-line no-unused-vars
+function formatCopyableText(data, fields) {
+  if (!data) return '';
+  if (data.isWord) {
+    var normalized = normalizeCopyWordFields(fields);
+    var lines = [];
+    for (var i = 0; i < normalized.length; i++) {
+      if (!normalized[i].enabled) continue;
+      var text = extractWordCopyField(data, normalized[i].key);
+      if (text) lines.push(text);
+    }
+    if (lines.length) return lines.join('\n');
+    return extractWordCopyField(data, 'definition');
+  }
+  if (data.translation) return data.translation;
+  if (data.contextAnalysis && data.contextAnalysis.coreTranslation) {
+    return data.contextAnalysis.coreTranslation;
+  }
+  return '';
+}
+
 // 从 chrome.storage.sync 读取访问令牌；content / background / popup / review 各上下文通用。
 // eslint-disable-next-line no-unused-vars
 function getAccessToken() {

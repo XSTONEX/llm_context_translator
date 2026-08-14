@@ -14,10 +14,12 @@ function createElement(id = '') {
     title: '',
     innerHTML: '',
     disabled: false,
+    draggable: false,
     options: [],
     selectedIndex: 0,
     children: [],
     className: '',
+    dataset: {},
     classList: {
       add(...names) {
         names.forEach((name) => classes.add(name));
@@ -28,6 +30,10 @@ function createElement(id = '') {
     },
     closest() {
       return createElement();
+    },
+    setAttribute() {},
+    querySelectorAll() {
+      return [];
     },
     addEventListener(type, listener) {
       listeners[type] = listener;
@@ -58,7 +64,8 @@ function loadPopup() {
     favoritesList: createElement('favoritesList'),
     historyList: createElement('historyList'),
     reviewButton: createElement('reviewButton'),
-    exportButton: createElement('exportButton')
+    exportButton: createElement('exportButton'),
+    copyFieldList: createElement('copyFieldList')
   };
   const storageChangeListeners = [];
   const createdTabs = [];
@@ -69,6 +76,24 @@ function loadPopup() {
     DEFAULT_API_BASE: 'https://hover.sqw.org.cn',
     DEFAULT_THEME_MODE: 'system',
     THEME_MODE_KEY: 'themeMode',
+    COPY_WORD_FIELDS_KEY: 'copyWordFields',
+    COPY_WORD_FIELD_LABELS: { word: '单词', phonetic: '音标', definition: '释义' },
+    getDefaultCopyWordFields() {
+      return [
+        { key: 'word', enabled: false },
+        { key: 'phonetic', enabled: false },
+        { key: 'definition', enabled: true }
+      ];
+    },
+    normalizeCopyWordFields(value) {
+      return Array.isArray(value) && value.length
+        ? value
+        : [
+            { key: 'word', enabled: false },
+            { key: 'phonetic', enabled: false },
+            { key: 'definition', enabled: true }
+          ];
+    },
     normalizeThemeMode(mode) {
       return mode === 'light' || mode === 'dark' || mode === 'system' ? mode : 'system';
     },
