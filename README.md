@@ -43,7 +43,10 @@ uv run uvicorn app:app --reload
 ```
 SILICONFLOW_API_KEY=your_api_key
 LLM_API_BASE_URL=https://api.siliconflow.cn/v1
-DEERAPI_KEY=your_tts_key          # 可选，TTS 发音
+TTS_PROVIDER=gptsapi              # gptsapi（国内直连）或 deerapi
+TTS_VOICE=nova                    # 锁定音色
+GPTSAPI_KEY=your_tts_key          # 可选，TTS 发音
+DEERAPI_KEY=your_deerapi_key      # 备用供应商
 LCT_ACCESS_TOKEN=replace_me       # 公网部署必填
 LCT_RATE_LIMIT_REQUESTS=60
 LCT_RATE_LIMIT_WINDOW_SECONDS=60

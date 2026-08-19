@@ -11,8 +11,13 @@ from app import (
     check_rate_limit,
     deerapi_request_kwargs,
     ensure_done_event_fields,
+    generate_tts_bytes,
+    gptsapi_request_kwargs,
     require_access_token,
     resolve_user_id,
+    tts_configured,
+    tts_provider_settings,
+    tts_request_kwargs,
 )
 from fastapi import HTTPException
 from json_stream_parser import JsonStreamParser
@@ -303,7 +308,7 @@ class EnsureFavoriteAudioTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch("app.cos_configured", return_value=True),
-            patch("app.DEERAPI_KEY", "fake-key"),
+            patch("app.tts_configured", return_value=True),
             patch("app.download_audio", return_value=None),
             patch("app.upload_audio") as mock_upload,
             patch(
@@ -314,7 +319,7 @@ class EnsureFavoriteAudioTests(unittest.IsolatedAsyncioTestCase):
             result = await ensure_favorite_audio("default", dict(item))
 
         self.assertTrue(result.get("audioKey", "").endswith(".mp3"))
-        self.assertEqual(result.get("audioVoice"), "alloy")
+        self.assertEqual(result.get("audioVoice"), "nova")
         mock_upload.assert_called_once()
         stored = storage.get_favorite("default", "en", "hello")
         self.assertEqual(stored.get("audioKey"), result["audioKey"])
@@ -354,7 +359,7 @@ class EnsureFavoriteAudioTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch("app.cos_configured", return_value=True),
-            patch("app.DEERAPI_KEY", "fake-key"),
+            patch("app.tts_configured", return_value=True),
             patch("app.download_audio", return_value=None),
             patch("app.upload_audio"),
             patch(
@@ -383,6 +388,154 @@ class DeerapiProxyTests(unittest.TestCase):
                 deerapi_request_kwargs(),
                 {"proxy": "http://127.0.0.1:7890"},
             )
+
+
+class GptsapiProviderTests(unittest.TestCase):
+    def test_gptsapi_never_attaches_proxy(self):
+        with patch("app.DEERAPI_HTTP_PROXY", "http://127.0.0.1:7890"):
+            self.assertEqual(gptsapi_request_kwargs(), {})
+
+    def test_tts_request_kwargs_are_empty_when_provider_is_gptsapi(self):
+        with (
+            patch("app.TTS_PROVIDER", "gptsapi"),
+            patch("app.DEERAPI_HTTP_PROXY", "http://127.0.0.1:7890"),
+        ):
+            self.assertEqual(tts_request_kwargs(), {})
+
+    def test_tts_request_kwargs_keep_deerapi_proxy_when_provider_is_deerapi(self):
+        with (
+            patch("app.TTS_PROVIDER", "deerapi"),
+            patch("app.DEERAPI_HTTP_PROXY", "http://127.0.0.1:7890"),
+        ):
+            self.assertEqual(
+                tts_request_kwargs(),
+                {"proxy": "http://127.0.0.1:7890"},
+            )
+
+    def test_tts_configured_reads_gptsapi_key(self):
+        with patch("app.TTS_PROVIDER", "gptsapi"), patch("app.GPTSAPI_KEY", ""):
+            self.assertFalse(tts_configured())
+        with patch("app.TTS_PROVIDER", "gptsapi"), patch("app.GPTSAPI_KEY", "sk-x"):
+            self.assertTrue(tts_configured())
+
+    def test_tts_configured_reads_deerapi_key(self):
+        with patch("app.TTS_PROVIDER", "deerapi"), patch("app.DEERAPI_KEY", ""):
+            self.assertFalse(tts_configured())
+        with patch("app.TTS_PROVIDER", "deerapi"), patch("app.DEERAPI_KEY", "sk-x"):
+            self.assertTrue(tts_configured())
+
+    def test_gptsapi_settings_use_tts1_and_gptsapi_host(self):
+        with (
+            patch("app.TTS_PROVIDER", "gptsapi"),
+            patch("app.GPTSAPI_KEY", "sk-gpts"),
+            patch("app.GPTSAPI_BASE_URL", "https://api.gptsapi.net/v1"),
+        ):
+            settings = tts_provider_settings()
+        self.assertEqual(settings["key"], "sk-gpts")
+        self.assertEqual(settings["base_url"], "https://api.gptsapi.net/v1")
+        self.assertEqual(settings["model"], "tts-1")
+        self.assertEqual(settings["request_kwargs"], {})
+
+    def test_deerapi_settings_keep_mini_tts_and_proxy(self):
+        with (
+            patch("app.TTS_PROVIDER", "deerapi"),
+            patch("app.DEERAPI_KEY", "sk-deer"),
+            patch("app.DEERAPI_BASE_URL", "https://api.deerapi.com/v1"),
+            patch("app.DEERAPI_HTTP_PROXY", "http://127.0.0.1:7890"),
+        ):
+            settings = tts_provider_settings()
+        self.assertEqual(settings["key"], "sk-deer")
+        self.assertEqual(settings["base_url"], "https://api.deerapi.com/v1")
+        self.assertEqual(settings["model"], "gpt-4o-mini-tts")
+        self.assertEqual(settings["request_kwargs"], {"proxy": "http://127.0.0.1:7890"})
+
+
+class GenerateTtsBytesProviderTests(unittest.IsolatedAsyncioTestCase):
+    async def test_generate_tts_posts_to_gptsapi_without_proxy(self):
+        from app import app
+
+        class _Resp:
+            status = 200
+
+            async def read(self):
+                return b"ID3fake-mp3"
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+        class _Session:
+            def __init__(self):
+                self.calls = []
+
+            def post(self, url, json=None, headers=None, **kwargs):
+                self.calls.append(
+                    {"url": url, "json": json, "headers": headers, "kwargs": kwargs}
+                )
+                return _Resp()
+
+        session = _Session()
+        app.state.session = session
+        with (
+            patch("app.TTS_PROVIDER", "gptsapi"),
+            patch("app.GPTSAPI_KEY", "sk-gpts"),
+            patch("app.GPTSAPI_BASE_URL", "https://api.gptsapi.net/v1"),
+            patch("app.TTS_VOICE", "nova"),
+        ):
+            audio = await generate_tts_bytes("hello")
+
+        self.assertEqual(audio, b"ID3fake-mp3")
+        self.assertEqual(len(session.calls), 1)
+        call = session.calls[0]
+        self.assertEqual(call["url"], "https://api.gptsapi.net/v1/audio/speech")
+        self.assertEqual(call["json"]["model"], "tts-1")
+        self.assertEqual(call["json"]["input"], "hello")
+        self.assertEqual(call["json"]["voice"], "nova")
+        self.assertEqual(call["headers"]["Authorization"], "Bearer sk-gpts")
+        self.assertNotIn("proxy", call["kwargs"])
+
+    async def test_generate_tts_posts_to_deerapi_with_proxy(self):
+        from app import app
+
+        class _Resp:
+            status = 200
+
+            async def read(self):
+                return b"ID3deer"
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+        class _Session:
+            def __init__(self):
+                self.calls = []
+
+            def post(self, url, json=None, headers=None, **kwargs):
+                self.calls.append(
+                    {"url": url, "json": json, "headers": headers, "kwargs": kwargs}
+                )
+                return _Resp()
+
+        session = _Session()
+        app.state.session = session
+        with (
+            patch("app.TTS_PROVIDER", "deerapi"),
+            patch("app.DEERAPI_KEY", "sk-deer"),
+            patch("app.DEERAPI_BASE_URL", "https://api.deerapi.com/v1"),
+            patch("app.DEERAPI_HTTP_PROXY", "http://127.0.0.1:7890"),
+        ):
+            audio = await generate_tts_bytes("hello", voice="alloy")
+
+        self.assertEqual(audio, b"ID3deer")
+        call = session.calls[0]
+        self.assertEqual(call["url"], "https://api.deerapi.com/v1/audio/speech")
+        self.assertEqual(call["json"]["model"], "gpt-4o-mini-tts")
+        self.assertEqual(call["kwargs"].get("proxy"), "http://127.0.0.1:7890")
 
 
 class UserResolutionTests(unittest.TestCase):

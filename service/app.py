@@ -18,11 +18,15 @@ from config import (
     DEERAPI_BASE_URL,
     DEERAPI_HTTP_PROXY,
     DEERAPI_KEY,
+    GPTSAPI_BASE_URL,
+    GPTSAPI_KEY,
     LCT_ACCESS_TOKEN,
     LCT_RATE_LIMIT_REQUESTS,
     LCT_RATE_LIMIT_WINDOW_SECONDS,
     LLM_API_BASE_URL,
     SILICONFLOW_API_KEY,
+    TTS_PROVIDER,
+    TTS_VOICE,
     cos_configured,
 )
 import storage
@@ -43,7 +47,7 @@ MAX_TRANSLATE_CHARS = 4000
 
 class TTSRequest(BaseModel):
     text: str
-    voice: str = "alloy"
+    voice: str = "nova"
 
 
 class TranslateRequest(BaseModel):
@@ -430,29 +434,71 @@ def deerapi_request_kwargs() -> dict:
     return {}
 
 
-async def generate_tts_bytes(text: str, voice: str = "alloy") -> bytes:
-    """调用 DeerAPI 生成语音二进制；失败抛 HTTPException。"""
-    if not DEERAPI_KEY:
-        raise HTTPException(status_code=500, detail="DEERAPI_KEY 未配置")
+def gptsapi_request_kwargs() -> dict:
+    """gptsapi 国内机房可直连, 不附加代理"""
+    return {}
+
+
+def tts_request_kwargs() -> dict:
+    """按当前 TTS_PROVIDER 返回 aiohttp 额外参数"""
+    if TTS_PROVIDER == "gptsapi":
+        return gptsapi_request_kwargs()
+    return deerapi_request_kwargs()
+
+
+def tts_configured() -> bool:
+    """当前供应商的 key 是否已配置"""
+    if TTS_PROVIDER == "gptsapi":
+        return bool(GPTSAPI_KEY)
+    return bool(DEERAPI_KEY)
+
+
+def tts_provider_settings() -> dict:
+    """当前供应商的 endpoint / key / model / 请求附加参数"""
+    if TTS_PROVIDER == "gptsapi":
+        return {
+            "key": GPTSAPI_KEY,
+            "base_url": GPTSAPI_BASE_URL,
+            "model": "tts-1",
+            "request_kwargs": gptsapi_request_kwargs(),
+        }
+    return {
+        "key": DEERAPI_KEY,
+        "base_url": DEERAPI_BASE_URL,
+        "model": "gpt-4o-mini-tts",
+        "request_kwargs": deerapi_request_kwargs(),
+    }
+
+
+def resolve_tts_voice(requested: str = "") -> str:
+    """线上音色以 TTS_VOICE 为准; 未配置时才用请求值"""
+    return (TTS_VOICE or requested or "nova").strip()
+
+
+async def generate_tts_bytes(text: str, voice: str = "") -> bytes:
+    """调用当前 TTS 供应商生成语音二进制; 失败抛 HTTPException"""
+    settings = tts_provider_settings()
+    if not settings["key"]:
+        raise HTTPException(status_code=500, detail=f"{TTS_PROVIDER} TTS key 未配置")
     if len(text) > MAX_TTS_CHARS:
         raise HTTPException(
             status_code=413, detail=f"TTS 文本过长（上限 {MAX_TTS_CHARS} 字符）"
         )
 
-    url = f"{DEERAPI_BASE_URL}/audio/speech"
+    url = f"{settings['base_url'].rstrip('/')}/audio/speech"
     headers = {
-        "Authorization": f"Bearer {DEERAPI_KEY}",
+        "Authorization": f"Bearer {settings['key']}",
         "Content-Type": "application/json",
     }
     payload = {
-        "model": "gpt-4o-mini-tts",
+        "model": settings["model"],
         "input": text,
-        "voice": voice,
+        "voice": resolve_tts_voice(voice),
     }
 
     try:
         async with app.state.session.post(
-            url, json=payload, headers=headers, **deerapi_request_kwargs()
+            url, json=payload, headers=headers, **settings["request_kwargs"]
         ) as resp:
             if resp.status != 200:
                 error_text = await resp.text()
@@ -466,10 +512,11 @@ async def generate_tts_bytes(text: str, voice: str = "alloy") -> bytes:
 
 
 async def ensure_favorite_audio(
-    user_id: str, item: dict, voice: str = "alloy"
+    user_id: str, item: dict, voice: str = ""
 ) -> dict:
     """保证 item 带 audioKey 并已上传 COS。失败时原样返回，不阻断收藏主路径。"""
-    if not cos_configured() or not DEERAPI_KEY:
+    voice = resolve_tts_voice(voice)
+    if not cos_configured() or not tts_configured():
         return item
 
     query = (item.get("query") or "").strip()
@@ -557,10 +604,11 @@ def add_favorite(item: FavoriteItem, user_id: str = Depends(current_user)):
 async def get_favorite_audio(
     query: str,
     lang: str = "en",
-    voice: str = "alloy",
+    voice: str = "",
     user_id: str = Depends(current_user),
 ):
     """返回收藏词的 mp3。优先 COS；缺失则懒生成并回填。"""
+    voice = resolve_tts_voice(voice)
     if not query or not query.strip():
         raise HTTPException(status_code=400, detail="query 不能为空")
 
@@ -631,7 +679,7 @@ def _missing_audio(item: dict) -> bool:
     dependencies=[Depends(require_rate_limit), Depends(require_access_token)],
 )
 async def ensure_favorites_audio(
-    voice: str = "alloy",
+    voice: str = "",
     user_id: str = Depends(current_user),
 ):
     """为缺 audioKey 的生词现场生成 TTS 并上传 COS，写回完整链路。
@@ -639,6 +687,7 @@ async def ensure_favorites_audio(
     打开生词本 / 复习页时由客户端在 list 同步后调用。
     单次最多处理 MAX_ENSURE_AUDIO_PER_REQUEST 条；remaining>0 时可再调。
     """
+    voice = resolve_tts_voice(voice)
     items = storage.list_favorites(user_id)
     missing = [item for item in items if _missing_audio(item)]
     batch = missing[:MAX_ENSURE_AUDIO_PER_REQUEST]

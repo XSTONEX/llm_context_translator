@@ -18,6 +18,15 @@ DEERAPI_BASE_URL: str = os.getenv("DEERAPI_BASE_URL", "https://api.deerapi.com/v
 # DeerAPI 按地区封禁国内机房 IP。阿里云等环境需走本机 HTTP 代理（如 mihomo :7890）。
 DEERAPI_HTTP_PROXY: str = os.getenv("DEERAPI_HTTP_PROXY", "")
 
+# gptsapi 国内机房可直连, 不走代理
+GPTSAPI_KEY: str = os.getenv("GPTSAPI_KEY", "")
+GPTSAPI_BASE_URL: str = os.getenv("GPTSAPI_BASE_URL", "https://api.gptsapi.net/v1")
+
+# tts 供应商: gptsapi | deerapi
+TTS_PROVIDER: str = (os.getenv("TTS_PROVIDER", "gptsapi") or "gptsapi").strip().lower()
+# 线上锁定的音色; 未选定时默认 nova
+TTS_VOICE: str = (os.getenv("TTS_VOICE", "nova") or "nova").strip()
+
 # 生词本 SQLite 数据库路径（默认放在 service/data/ 下，已被 .gitignore 忽略）
 LCT_DB_PATH: str = os.getenv(
     "LCT_DB_PATH", str(Path(__file__).parent / "data" / "favorites.db")

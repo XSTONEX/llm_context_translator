@@ -85,12 +85,12 @@
     bulkImport: (items) => call('POST', '/api/favorites/bulk', { favorites: items }),
 
     /** 拉取收藏词音频 blob（带鉴权；用于复习页播放）。 */
-    async fetchAudioBlob(lang, query, voice = 'alloy') {
+    async fetchAudioBlob(lang, query, voice = 'nova') {
       const apiBase = await getApiBase();
       const qs = new URLSearchParams({
         lang: lang || 'en',
         query: query || '',
-        voice: voice || 'alloy'
+        voice: voice || 'nova'
       });
       const res = await fetch(apiBase + '/api/favorites/audio?' + qs.toString(), {
         method: 'GET',

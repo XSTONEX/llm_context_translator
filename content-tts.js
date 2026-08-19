@@ -40,7 +40,7 @@
   }
 
   function cacheKey(text, voice) {
-    return [voice || 'alloy', text].join('::');
+    return [voice || 'nova', text].join('::');
   }
 
   async function getAuthHeaders() {
@@ -48,7 +48,7 @@
     return token ? { 'X-LCT-Token': token } : {};
   }
 
-  async function fetchTTS(text, voice = 'alloy') {
+  async function fetchTTS(text, voice = 'nova') {
     if (!text) return;
 
     const key = cacheKey(text, voice);
