@@ -135,10 +135,11 @@
     },
 
     async getSettings() {
-      const result = await getStorage(['selectedModel', 'sourceLangMode', 'targetLang']);
+      const result = await getStorage(['selectedModel', 'sourceLangMode', 'targetLang', 'wordsOnly']);
       return {
         model: result.selectedModel || null,
-        sourceLangMode: result.sourceLangMode || result.targetLang || 'auto'
+        sourceLangMode: result.sourceLangMode || result.targetLang || 'auto',
+        wordsOnly: Boolean(result.wordsOnly)
       };
     },
 

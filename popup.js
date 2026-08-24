@@ -28,6 +28,7 @@ function init() {
   const els = {
     statusDot: document.getElementById('statusDot'),
     enableToggle: document.getElementById('enableToggle'),
+    wordsOnlyToggle: document.getElementById('wordsOnlyToggle'),
     langSelect: document.getElementById('langSelect'),
     ttsPlayModeSelect: document.getElementById('ttsPlayModeSelect'),
     themeSelect: document.getElementById('themeSelect'),
@@ -46,6 +47,8 @@ function init() {
 
   const toggleSwitch = els.enableToggle.closest('.toggle-switch');
   toggleSwitch.classList.add('no-transition');
+  const wordsOnlySwitch = els.wordsOnlyToggle && els.wordsOnlyToggle.closest('.toggle-switch');
+  if (wordsOnlySwitch) wordsOnlySwitch.classList.add('no-transition');
 
   let themeMode = typeof DEFAULT_THEME_MODE !== 'undefined' ? DEFAULT_THEME_MODE : 'system';
   const themeKey = typeof THEME_MODE_KEY !== 'undefined' ? THEME_MODE_KEY : 'themeMode';
@@ -83,14 +86,16 @@ function init() {
   });
 
   chrome.storage.local.get(
-    ['enabled', 'apiBase', 'selectedModel', 'sourceLangMode', 'targetLang', 'ttsPlayMode', themeKey, 'lookupHistory', 'favoriteLookups'],
+    ['enabled', 'apiBase', 'selectedModel', 'sourceLangMode', 'targetLang', 'ttsPlayMode', themeKey, 'lookupHistory', 'favoriteLookups', 'wordsOnly'],
     (result) => {
       const enabled = result.enabled !== undefined ? result.enabled : true;
+      const wordsOnly = Boolean(result.wordsOnly);
       const apiBase = result.apiBase || DEFAULT_API_BASE;
       const savedModel = result.selectedModel || null;
       const sourceLangMode = result.sourceLangMode || result.targetLang || 'auto';
 
       els.enableToggle.checked = enabled;
+      if (els.wordsOnlyToggle) els.wordsOnlyToggle.checked = wordsOnly;
       els.apiBaseInput.value = apiBase;
       els.langSelect.value = sourceLangMode;
       els.ttsPlayModeSelect.value = result.ttsPlayMode || 'off';
@@ -98,6 +103,10 @@ function init() {
 
       toggleSwitch.offsetHeight;
       toggleSwitch.classList.remove('no-transition');
+      if (wordsOnlySwitch) {
+        wordsOnlySwitch.offsetHeight;
+        wordsOnlySwitch.classList.remove('no-transition');
+      }
 
       checkStatus(apiBase, els.statusDot, els.modelInfo);
       loadModels(apiBase, els.modelSelect, els.modelInfo, savedModel);
@@ -152,6 +161,12 @@ function init() {
     chrome.runtime.sendMessage({ type: 'TOGGLE_ENABLED', enabled }).catch(() => {});
   });
 
+  if (els.wordsOnlyToggle) {
+    els.wordsOnlyToggle.addEventListener('change', () => {
+      chrome.storage.local.set({ wordsOnly: els.wordsOnlyToggle.checked });
+    });
+  }
+
   els.shortcutCustomizeButton.addEventListener('click', () => {
     chrome.tabs.create({ url: 'chrome://extensions/shortcuts' });
   });
@@ -205,6 +220,9 @@ function init() {
     }
     if (changes.enabled) {
       els.enableToggle.checked = changes.enabled.newValue !== undefined ? changes.enabled.newValue : true;
+    }
+    if (changes.wordsOnly && els.wordsOnlyToggle) {
+      els.wordsOnlyToggle.checked = Boolean(changes.wordsOnly.newValue);
     }
     if (changes[themeKey]) {
       setThemeMode(changes[themeKey].newValue);

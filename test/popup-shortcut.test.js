@@ -52,6 +52,7 @@ function loadPopup() {
   const elements = {
     statusDot: createElement('statusDot'),
     enableToggle: createElement('enableToggle'),
+    wordsOnlyToggle: createElement('wordsOnlyToggle'),
     langSelect: createElement('langSelect'),
     ttsPlayModeSelect: createElement('ttsPlayModeSelect'),
     themeSelect: createElement('themeSelect'),
@@ -69,6 +70,7 @@ function loadPopup() {
   };
   const storageChangeListeners = [];
   const createdTabs = [];
+  const storageSets = [];
   let domReadyListener = null;
 
   const context = {
@@ -128,12 +130,15 @@ function loadPopup() {
           get(keys, callback) {
             callback({
               enabled: true,
+              wordsOnly: false,
               apiBase: 'https://hover.sqw.org.cn',
               lookupHistory: [],
               favoriteLookups: []
             });
           },
-          set() {}
+          set(values) {
+            storageSets.push(values);
+          }
         },
         onChanged: {
           addListener(listener) {
@@ -188,7 +193,7 @@ function loadPopup() {
   assert.equal(typeof domReadyListener, 'function');
   domReadyListener();
 
-  return { elements, storageChangeListeners, createdTabs };
+  return { elements, storageChangeListeners, createdTabs, storageSets };
 }
 
 const harness = loadPopup();
@@ -204,6 +209,8 @@ harness.elements.reviewButton.dispatch('click');
 assert.equal(harness.createdTabs.length, 2);
 assert.equal(harness.createdTabs[1].url, 'chrome-extension://test/review.html');
 
+assert.equal(harness.elements.wordsOnlyToggle.checked, false);
+
 harness.storageChangeListeners[0](
   {
     enabled: { newValue: false }
@@ -211,3 +218,15 @@ harness.storageChangeListeners[0](
   'local'
 );
 assert.equal(harness.elements.enableToggle.checked, false);
+
+harness.storageChangeListeners[0](
+  {
+    wordsOnly: { newValue: true }
+  },
+  'local'
+);
+assert.equal(harness.elements.wordsOnlyToggle.checked, true);
+
+harness.elements.wordsOnlyToggle.checked = false;
+harness.elements.wordsOnlyToggle.dispatch('change');
+assert.equal(harness.storageSets[harness.storageSets.length - 1].wordsOnly, false);

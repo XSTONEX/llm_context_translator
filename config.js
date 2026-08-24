@@ -119,6 +119,30 @@ function formatCopyableText(data, fields) {
   return '';
 }
 
+// ---------- 仅单词/词组门禁（popup 开关, content 选区拦截） ----------
+// eslint-disable-next-line no-var
+var WORDS_ONLY_KEY = 'wordsOnly';
+// eslint-disable-next-line no-var
+var DEFAULT_WORDS_ONLY = false;
+// 单词或两个词的词组;比后端 WORD_COUNT_THRESHOLD (默认 3) 更严
+// eslint-disable-next-line no-var
+var WORDS_ONLY_MAX_TOKENS = 2;
+// 与 service/language_strategy.py 的 JA_WORD_CHAR_THRESHOLD 对齐
+// eslint-disable-next-line no-var
+var JA_WORD_CHAR_THRESHOLD = 10;
+
+// eslint-disable-next-line no-unused-vars
+function isWordOrPhrase(text, lang) {
+  var trimmed = String(text == null ? '' : text).trim();
+  if (!trimmed) return false;
+  if (lang === 'ja') {
+    if (/[。？！]/.test(trimmed)) return false;
+    return trimmed.length <= JA_WORD_CHAR_THRESHOLD;
+  }
+  var tokens = trimmed.split(/\s+/).filter(Boolean);
+  return tokens.length > 0 && tokens.length <= WORDS_ONLY_MAX_TOKENS;
+}
+
 // 从 chrome.storage.sync 读取访问令牌；content / background / popup / review 各上下文通用。
 // eslint-disable-next-line no-unused-vars
 function getAccessToken() {

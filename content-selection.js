@@ -41,12 +41,17 @@
     if (selectedText === state.currentText && state.isVisible) return;
     if (!selection || selection.rangeCount === 0) return;
 
+    const settings = await LCT.storage.getSettings();
+    const lang = LCT.lang.resolve(settings.sourceLangMode, selectedText);
+    if (settings.wordsOnly && !isWordOrPhrase(selectedText, lang)) {
+      if (state.isVisible && !state.isPinned) LCT.panel.hidePanel();
+      return;
+    }
+
     const range = selection.getRangeAt(0);
     const rect = range.getBoundingClientRect();
     const contextSentence = extractContextSentence(selection);
 
-    const settings = await LCT.storage.getSettings();
-    const lang = LCT.lang.resolve(settings.sourceLangMode, selectedText);
     const apiBase = await LCT.storage.getApiBase();
     const request = {
       id: ++state.activeRequestId,
