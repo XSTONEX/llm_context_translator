@@ -54,6 +54,7 @@ function loadPopup() {
     enableToggle: createElement('enableToggle'),
     wordsOnlyToggle: createElement('wordsOnlyToggle'),
     langSelect: createElement('langSelect'),
+    ttsEnabledToggle: createElement('ttsEnabledToggle'),
     ttsPlayModeSelect: createElement('ttsPlayModeSelect'),
     themeSelect: createElement('themeSelect'),
     apiBaseInput: createElement('apiBaseInput'),
@@ -230,3 +231,26 @@ assert.equal(harness.elements.wordsOnlyToggle.checked, true);
 harness.elements.wordsOnlyToggle.checked = false;
 harness.elements.wordsOnlyToggle.dispatch('change');
 assert.equal(harness.storageSets[harness.storageSets.length - 1].wordsOnly, false);
+
+// 发音开关: 未存储时默认开启, 自动发音下拉可用
+assert.equal(harness.elements.ttsEnabledToggle.checked, true);
+assert.equal(harness.elements.ttsPlayModeSelect.disabled, false);
+
+harness.storageChangeListeners[0](
+  {
+    ttsEnabled: { newValue: false }
+  },
+  'local'
+);
+assert.equal(harness.elements.ttsEnabledToggle.checked, false);
+assert.equal(harness.elements.ttsPlayModeSelect.disabled, true);
+
+harness.elements.ttsEnabledToggle.checked = true;
+harness.elements.ttsEnabledToggle.dispatch('change');
+assert.equal(harness.storageSets[harness.storageSets.length - 1].ttsEnabled, true);
+assert.equal(harness.elements.ttsPlayModeSelect.disabled, false);
+
+harness.elements.ttsEnabledToggle.checked = false;
+harness.elements.ttsEnabledToggle.dispatch('change');
+assert.equal(harness.storageSets[harness.storageSets.length - 1].ttsEnabled, false);
+assert.equal(harness.elements.ttsPlayModeSelect.disabled, true);

@@ -143,6 +143,19 @@ function isWordOrPhrase(text, lang) {
   return tokens.length > 0 && tokens.length <= WORDS_ONLY_MAX_TOKENS;
 }
 
+// ---------- 发音总开关（popup 开关, 只管划词面板; 复习页不受影响） ----------
+// 关闭后不请求 /api/tts、不显示喇叭按钮; 与「自动发音」播放次数相互独立
+// eslint-disable-next-line no-var
+var TTS_ENABLED_KEY = 'ttsEnabled';
+// eslint-disable-next-line no-var
+var DEFAULT_TTS_ENABLED = true;
+
+// 未设置时按默认开启处理, 只有显式 false 才算关闭
+// eslint-disable-next-line no-unused-vars
+function resolveTtsEnabled(value) {
+  return value === undefined ? DEFAULT_TTS_ENABLED : value !== false;
+}
+
 // 从 chrome.storage.sync 读取访问令牌；content / background / popup / review 各上下文通用。
 // eslint-disable-next-line no-unused-vars
 function getAccessToken() {

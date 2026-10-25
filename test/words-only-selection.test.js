@@ -117,6 +117,7 @@ function loadSelection(storageData, selectedText) {
     disconnectActivePort() {}
   };
   context.LCT.tts = {
+    setEnabled() {},
     fetchTTS() {
       calls.fetchTTS += 1;
     },

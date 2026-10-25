@@ -32,6 +32,7 @@
     activePort: null,
     panelEventsBound: false,
     dragEventsBound: false,
+    ttsEnabled: true,
     ttsAbortController: null,
     ttsBlobUrl: null,
     ttsReady: false,

@@ -259,13 +259,17 @@
   }
 
   function init() {
-    chrome.storage.local.get(['enabled'], (result) => {
+    chrome.storage.local.get(['enabled', TTS_ENABLED_KEY], (result) => {
       state.enabled = result.enabled !== undefined ? result.enabled : true;
+      LCT.tts.setEnabled(resolveTtsEnabled(result[TTS_ENABLED_KEY]));
     });
 
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area === 'local' && changes.enabled) {
         handleToggle(changes.enabled.newValue);
+      }
+      if (area === 'local' && changes[TTS_ENABLED_KEY]) {
+        LCT.tts.setEnabled(resolveTtsEnabled(changes[TTS_ENABLED_KEY].newValue));
       }
     });
 

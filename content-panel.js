@@ -495,9 +495,11 @@
       header.appendChild(original);
     }
 
-    const speakerBtn = createIconButton('speaker', ICONS.speaker, '发音');
-    speakerBtn.classList.add('lct-speaker');
-    header.appendChild(speakerBtn);
+    if (state.ttsEnabled) {
+      const speakerBtn = createIconButton('speaker', ICONS.speaker, '发音');
+      speakerBtn.classList.add('lct-speaker');
+      header.appendChild(speakerBtn);
+    }
     header.classList.add('lct-fade-in');
     LCT.tts.updateSpeakerButtonState();
   }
@@ -995,9 +997,11 @@
       }
     });
 
-    const speakerBtn = createIconButton('speaker', ICONS.speaker, '发音');
-    speakerBtn.classList.add('lct-speaker');
-    header.appendChild(speakerBtn);
+    if (state.ttsEnabled) {
+      const speakerBtn = createIconButton('speaker', ICONS.speaker, '发音');
+      speakerBtn.classList.add('lct-speaker');
+      header.appendChild(speakerBtn);
+    }
     return header;
   }
 

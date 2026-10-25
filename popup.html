@@ -240,6 +240,11 @@
       box-shadow: 0 0 0 2px var(--accent-soft);
     }
 
+    .model-select:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
     .model-select optgroup {
       font-weight: 600;
       color: var(--text-secondary);
@@ -520,6 +525,14 @@
           <option value="en">English</option>
           <option value="ja">日本語</option>
         </select>
+      </div>
+
+      <div class="control-row">
+        <span class="control-label">发音</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="ttsEnabledToggle">
+          <span class="toggle-slider"></span>
+        </label>
       </div>
 
       <div class="control-row">

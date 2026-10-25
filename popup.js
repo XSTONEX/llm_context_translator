@@ -30,6 +30,7 @@ function init() {
     enableToggle: document.getElementById('enableToggle'),
     wordsOnlyToggle: document.getElementById('wordsOnlyToggle'),
     langSelect: document.getElementById('langSelect'),
+    ttsEnabledToggle: document.getElementById('ttsEnabledToggle'),
     ttsPlayModeSelect: document.getElementById('ttsPlayModeSelect'),
     themeSelect: document.getElementById('themeSelect'),
     apiBaseInput: document.getElementById('apiBaseInput'),
@@ -49,6 +50,18 @@ function init() {
   toggleSwitch.classList.add('no-transition');
   const wordsOnlySwitch = els.wordsOnlyToggle && els.wordsOnlyToggle.closest('.toggle-switch');
   if (wordsOnlySwitch) wordsOnlySwitch.classList.add('no-transition');
+  const ttsEnabledSwitch = els.ttsEnabledToggle && els.ttsEnabledToggle.closest('.toggle-switch');
+  if (ttsEnabledSwitch) ttsEnabledSwitch.classList.add('no-transition');
+
+  const ttsEnabledKey = typeof TTS_ENABLED_KEY !== 'undefined' ? TTS_ENABLED_KEY : 'ttsEnabled';
+  const resolveTts =
+    typeof resolveTtsEnabled === 'function' ? resolveTtsEnabled : (v) => v !== false;
+
+  // 发音关闭时「自动发音」没有意义，置灰避免出现「关了发音却播三遍」的矛盾配置
+  function setTtsEnabled(enabled) {
+    if (els.ttsEnabledToggle) els.ttsEnabledToggle.checked = enabled;
+    els.ttsPlayModeSelect.disabled = !enabled;
+  }
 
   let themeMode = typeof DEFAULT_THEME_MODE !== 'undefined' ? DEFAULT_THEME_MODE : 'system';
   const themeKey = typeof THEME_MODE_KEY !== 'undefined' ? THEME_MODE_KEY : 'themeMode';
@@ -86,7 +99,7 @@ function init() {
   });
 
   chrome.storage.local.get(
-    ['enabled', 'apiBase', 'selectedModel', 'sourceLangMode', 'targetLang', 'ttsPlayMode', themeKey, 'lookupHistory', 'favoriteLookups', 'wordsOnly'],
+    ['enabled', 'apiBase', 'selectedModel', 'sourceLangMode', 'targetLang', 'ttsPlayMode', themeKey, 'lookupHistory', 'favoriteLookups', 'wordsOnly', ttsEnabledKey],
     (result) => {
       const enabled = result.enabled !== undefined ? result.enabled : true;
       const wordsOnly = Boolean(result.wordsOnly);
@@ -99,6 +112,7 @@ function init() {
       els.apiBaseInput.value = apiBase;
       els.langSelect.value = sourceLangMode;
       els.ttsPlayModeSelect.value = result.ttsPlayMode || 'off';
+      setTtsEnabled(resolveTts(result[ttsEnabledKey]));
       setThemeMode(result[themeKey]);
 
       toggleSwitch.offsetHeight;
@@ -106,6 +120,10 @@ function init() {
       if (wordsOnlySwitch) {
         wordsOnlySwitch.offsetHeight;
         wordsOnlySwitch.classList.remove('no-transition');
+      }
+      if (ttsEnabledSwitch) {
+        ttsEnabledSwitch.offsetHeight;
+        ttsEnabledSwitch.classList.remove('no-transition');
       }
 
       checkStatus(apiBase, els.statusDot, els.modelInfo);
@@ -124,6 +142,14 @@ function init() {
       targetLang: els.langSelect.value === 'auto' ? 'en' : els.langSelect.value,
     });
   });
+
+  if (els.ttsEnabledToggle) {
+    els.ttsEnabledToggle.addEventListener('change', () => {
+      const enabled = els.ttsEnabledToggle.checked;
+      setTtsEnabled(enabled);
+      chrome.storage.local.set({ [ttsEnabledKey]: enabled });
+    });
+  }
 
   els.ttsPlayModeSelect.addEventListener('change', () => {
     chrome.storage.local.set({ ttsPlayMode: els.ttsPlayModeSelect.value });
@@ -223,6 +249,9 @@ function init() {
     }
     if (changes.wordsOnly && els.wordsOnlyToggle) {
       els.wordsOnlyToggle.checked = Boolean(changes.wordsOnly.newValue);
+    }
+    if (changes[ttsEnabledKey]) {
+      setTtsEnabled(resolveTts(changes[ttsEnabledKey].newValue));
     }
     if (changes[themeKey]) {
       setThemeMode(changes[themeKey].newValue);

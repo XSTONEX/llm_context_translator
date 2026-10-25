@@ -49,7 +49,8 @@
   }
 
   async function fetchTTS(text, voice = 'nova') {
-    if (!text) return;
+    // 发音总开关关闭：所有触发点都在这里统一拦截，不请求 /api/tts
+    if (!text || !state.ttsEnabled) return;
 
     const key = cacheKey(text, voice);
     const cached = state.ttsCache.get(key);
@@ -201,6 +202,7 @@
   // TTS 触发后立即调用：音频一就绪就按用户设置自动播放（off 不播 / once 一遍 / thrice 三遍），
   // 不再等整段翻译流式输出结束
   async function autoPlay() {
+    if (!state.ttsEnabled) return;
     const result = await LCT.storage.get(['ttsPlayMode']);
     const mode = result.ttsPlayMode || 'off';
     const times = mode === 'thrice' ? 3 : mode === 'once' ? 1 : 0;
@@ -208,7 +210,19 @@
     whenReady(() => playTimes(times));
   }
 
+  // 发音总开关：关闭时停掉正在加载/播放的音频，并移除当前面板上的喇叭按钮；
+  // 重新开启只影响之后的划词
+  function setEnabled(enabled) {
+    state.ttsEnabled = enabled;
+    if (enabled) return;
+    cleanup();
+    const panel = LCT.panel && LCT.panel.getPanel();
+    const btn = panel && panel.querySelector('[data-action="speaker"]');
+    if (btn) btn.remove();
+  }
+
   LCT.tts = {
+    setEnabled,
     cleanup,
     fetchTTS,
     updateSpeakerButtonState,
