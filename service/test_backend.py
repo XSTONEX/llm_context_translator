@@ -13,6 +13,7 @@ from app import (
     ensure_done_event_fields,
     generate_tts_bytes,
     gptsapi_request_kwargs,
+    llm_provider_settings,
     require_access_token,
     resolve_user_id,
     tts_configured,
@@ -147,6 +148,54 @@ class ModelAndPayloadTests(unittest.TestCase):
 
         encoded = json.dumps(payload, ensure_ascii=False)
         self.assertIn("单词/文本：watch", encoded)
+
+    def test_default_model_is_deepseek_flash(self):
+        self.assertEqual(DEFAULT_MODEL["id"], "deepseek-flash")
+
+    def test_retired_glm4_falls_back_to_default(self):
+        # 扩展里已存的旧选择不改也能切到新默认模型
+        self.assertEqual(resolve_model("THUDM/GLM-4-9B-0414"), "deepseek-flash")
+
+    def test_deepseek_flash_payload_disables_thinking(self):
+        payload = build_chat_payload("watch", "I watch birds.", model="deepseek-flash")
+
+        self.assertEqual(payload["thinking"], {"type": "disabled"})
+        self.assertNotIn("enable_thinking", payload)
+
+    def test_siliconflow_model_keeps_enable_thinking_flag(self):
+        payload = build_chat_payload(
+            "watch", "I watch birds.", model="Pro/deepseek-ai/DeepSeek-V3.2"
+        )
+
+        self.assertIs(payload["enable_thinking"], False)
+        self.assertNotIn("thinking", payload)
+
+    def test_extra_payload_is_not_shared_between_requests(self):
+        first = build_chat_payload("watch", "", model="deepseek-flash")
+        first["thinking"]["type"] = "enabled"
+        second = build_chat_payload("watch", "", model="deepseek-flash")
+
+        self.assertEqual(second["thinking"], {"type": "disabled"})
+
+
+class LlmProviderSettingsTests(unittest.TestCase):
+    def test_deepseek_model_goes_to_official_api(self):
+        with (
+            patch("app.DEEPSEEK_API_KEY", "sk-ds"),
+            patch("app.DEEPSEEK_BASE_URL", "https://api.deepseek.com/"),
+        ):
+            target = llm_provider_settings("deepseek-flash")
+        self.assertEqual(target["url"], "https://api.deepseek.com/chat/completions")
+        self.assertEqual(target["headers"]["Authorization"], "Bearer sk-ds")
+
+    def test_siliconflow_model_keeps_siliconflow_endpoint(self):
+        with (
+            patch("app.SILICONFLOW_API_KEY", "sk-sf"),
+            patch("app.LLM_API_BASE_URL", "https://api.siliconflow.cn/v1"),
+        ):
+            target = llm_provider_settings("Pro/zai-org/GLM-5")
+        self.assertEqual(target["url"], "https://api.siliconflow.cn/v1/chat/completions")
+        self.assertEqual(target["headers"]["Authorization"], "Bearer sk-sf")
 
 
 class AccessTokenTests(unittest.TestCase):

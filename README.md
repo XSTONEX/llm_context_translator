@@ -8,7 +8,7 @@
 - **单词模式** — 音标、释义、例句、上下文语境分析
 - **句子模式** — 高质量中文翻译、语法分析、关键表达提取
 - **流式响应** — SSE 实时输出，无需等待完整结果
-- **多模型支持** — GLM-4、DeepSeek、Qwen、Hunyuan 等
+- **多模型支持** — 默认 DeepSeek V4.1 Flash（官方 API 直连），另可选硅基流动上的 DeepSeek V3.2、GLM-5 等
 
 ## 项目结构
 
@@ -41,7 +41,8 @@ uv run uvicorn app:app --reload
 后端配置见 `service/.env`（参考 `service/.env.example`）：
 
 ```
-SILICONFLOW_API_KEY=your_api_key
+DEEPSEEK_API_KEY=your_deepseek_key # 默认模型 deepseek-flash 必填
+SILICONFLOW_API_KEY=your_api_key   # 硅基流动上的其他模型
 LLM_API_BASE_URL=https://api.siliconflow.cn/v1
 TTS_PROVIDER=gptsapi              # gptsapi（国内直连）或 deerapi
 TTS_VOICE=nova                    # 锁定音色

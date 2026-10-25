@@ -15,6 +15,8 @@ from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
 from config import (
+    DEEPSEEK_API_KEY,
+    DEEPSEEK_BASE_URL,
     DEERAPI_BASE_URL,
     DEERAPI_HTTP_PROXY,
     DEERAPI_KEY,
@@ -33,7 +35,14 @@ import storage
 from cos_audio import build_audio_key, delete_audio, download_audio, upload_audio
 from json_stream_parser import JsonStreamParser
 from language_strategy import get_strategy
-from models import DEFAULT_MODEL, get_models_response, model_supports_thinking, resolve_model
+from models import (
+    DEFAULT_MODEL,
+    get_models_response,
+    model_backend,
+    model_extra_payload,
+    model_supports_thinking,
+    resolve_model,
+)
 
 log = logging.getLogger("lct.app")
 
@@ -251,7 +260,23 @@ def build_chat_payload(
         payload["stream"] = True
     if model_supports_thinking(actual_model):
         payload["enable_thinking"] = False
+    payload.update(model_extra_payload(actual_model))
     return payload
+
+
+def llm_provider_settings(model_id: str) -> dict:
+    """按模型所属上游返回 chat/completions 的 url 与请求头"""
+    if model_backend(model_id) == "deepseek":
+        base_url, key = DEEPSEEK_BASE_URL, DEEPSEEK_API_KEY
+    else:
+        base_url, key = LLM_API_BASE_URL, SILICONFLOW_API_KEY
+    return {
+        "url": f"{base_url.rstrip('/')}/chat/completions",
+        "headers": {
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+        },
+    }
 
 
 # ========== 流式端点 ==========
@@ -281,17 +306,12 @@ async def stream_llm_response(
     strategy = get_strategy(lang)
     word_mode = strategy.is_word_mode(selected_text)
     payload = build_chat_payload(selected_text, context_sentence, model, lang, stream=True)
-
-    url = f"{LLM_API_BASE_URL}/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {SILICONFLOW_API_KEY}",
-        "Content-Type": "application/json",
-    }
+    target = llm_provider_settings(payload["model"])
 
     parser = JsonStreamParser(simple_fields=strategy.get_schema_fields(word_mode))
 
     try:
-        async with session.post(url, json=payload, headers=headers) as resp:
+        async with session.post(target["url"], json=payload, headers=target["headers"]) as resp:
             if resp.status != 200:
                 error_text = await resp.text()
                 yield f"data: {json.dumps({'type': 'error', 'message': f'LLM API 返回 {resp.status}: {error_text[:200]}'})}\n\n"
@@ -308,7 +328,8 @@ async def stream_llm_response(
 
                 try:
                     chunk_data = json.loads(data_str)
-                    delta = chunk_data.get("choices", [{}])[0].get("delta", {})
+                    # 末尾的 usage 块 choices 可能为空数组
+                    delta = (chunk_data.get("choices") or [{}])[0].get("delta", {})
                     content = delta.get("content", "")
                     if content:
                         events = parser.feed(content)
@@ -392,15 +413,12 @@ async def translate(req: TranslateRequest):
         req.lang,
         stream=False,
     )
-
-    url = f"{LLM_API_BASE_URL}/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {SILICONFLOW_API_KEY}",
-        "Content-Type": "application/json",
-    }
+    target = llm_provider_settings(payload["model"])
 
     try:
-        async with app.state.session.post(url, json=payload, headers=headers) as resp:
+        async with app.state.session.post(
+            target["url"], json=payload, headers=target["headers"]
+        ) as resp:
             if resp.status != 200:
                 error_text = await resp.text()
                 raise HTTPException(
