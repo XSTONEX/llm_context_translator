@@ -15,7 +15,17 @@
     DEBOUNCE_DELAY: 300,
     HISTORY_LIMIT: 50,
     TTS_CACHE_LIMIT: 20,
-    LOOKUP_CACHE_LIMIT: 200
+    LOOKUP_CACHE_LIMIT: 200,
+    // 触发图标：可见方块 / 实际热区 / 相对松手点的偏移 / 贴边留白
+    TRIGGER_ICON_SIZE: 22,
+    TRIGGER_HIT_SIZE: 32,
+    TRIGGER_OFFSET_X: 8,
+    TRIGGER_OFFSET_Y: 12,
+    TRIGGER_EDGE_GAP: 8,
+    // 无操作自动消失 / 鼠标远离多少 px 视为放弃 / 碰到后需停留多久才触发（0 = 立即）
+    TRIGGER_TIMEOUT: 4000,
+    TRIGGER_DISMISS_DISTANCE: 160,
+    TRIGGER_DWELL: 0
   };
 
   root.state = {
@@ -32,6 +42,7 @@
     activePort: null,
     panelEventsBound: false,
     dragEventsBound: false,
+    triggerMode: 'icon',
     ttsEnabled: true,
     ttsAbortController: null,
     ttsBlobUrl: null,
@@ -50,7 +61,9 @@
     speaker: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>',
     check: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
     retry: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>',
-    star: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>'
+    star: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>',
+    // 触发图标：取扩展 logo 里放大镜中的四角星，主星 + 右上小星；颜色由 styles.css 的渐变控制
+    trigger: '<svg class="lct-trigger-svg" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="lct-trigger-grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" class="lct-trigger-stop-a"/><stop offset="1" class="lct-trigger-stop-b"/></linearGradient></defs><path class="lct-trigger-glyph" d="M10.5 4C11.3 9 13.5 11.2 18.5 12C13.5 12.8 11.3 15 10.5 20C9.7 15 7.5 12.8 2.5 12C7.5 11.2 9.7 9 10.5 4Z"/><path class="lct-trigger-glyph lct-trigger-glyph-sm" d="M19 2.5C19.3 4.3 19.9 4.9 21.5 5.2C19.9 5.5 19.3 6.1 19 7.9C18.7 6.1 18.1 5.5 16.5 5.2C18.1 4.9 18.7 4.3 19 2.5Z"/></svg>'
   };
 
   root.lang = {

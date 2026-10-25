@@ -156,6 +156,18 @@ function resolveTtsEnabled(value) {
   return value === undefined ? DEFAULT_TTS_ENABLED : value !== false;
 }
 
+// ---------- 触发方式（popup 选择, content 划词流程分流） ----------
+// icon: 选中后在松手点旁显示小图标, 鼠标碰到/点击才翻译; instant: 选中即翻译（旧行为）
+// eslint-disable-next-line no-var
+var TRIGGER_MODE_KEY = 'triggerMode';
+// eslint-disable-next-line no-var
+var DEFAULT_TRIGGER_MODE = 'icon';
+
+// eslint-disable-next-line no-unused-vars
+function normalizeTriggerMode(value) {
+  return value === 'instant' || value === 'icon' ? value : DEFAULT_TRIGGER_MODE;
+}
+
 // 从 chrome.storage.sync 读取访问令牌；content / background / popup / review 各上下文通用。
 // eslint-disable-next-line no-unused-vars
 function getAccessToken() {

@@ -926,3 +926,140 @@
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
+
+/* ========== 触发图标（图标触发模式） ==========
+   外层 .lct-trigger 是 32px 透明热区，内层 .lct-trigger-chip 是 22px 可见方块。
+   data-h / data-v 记录图标相对松手点的方位，入场从靠近光标的那个角长出来。 */
+:host {
+  --lct-trigger-bg: #FFFFFF;
+  --lct-trigger-border: rgba(59, 130, 246, 0.28);
+  --lct-trigger-from: #2563EB;
+  --lct-trigger-to: #60A5FA;
+  --lct-trigger-fired-from: #3B82F6;
+  --lct-trigger-fired-to: #2563EB;
+  --lct-trigger-shadow: 0 1px 2px rgba(15, 23, 42, 0.08),
+                        0 4px 12px -2px rgba(59, 130, 246, 0.32);
+  --lct-trigger-ring: rgba(59, 130, 246, 0.35);
+}
+
+:host([data-theme="dark"]) {
+  --lct-trigger-bg: #2C2C2E;
+  --lct-trigger-border: rgba(96, 165, 250, 0.3);
+  --lct-trigger-from: #60A5FA;
+  --lct-trigger-to: #93C5FD;
+  --lct-trigger-fired-from: #60A5FA;
+  --lct-trigger-fired-to: #3B82F6;
+  --lct-trigger-shadow: 0 1px 2px rgba(0, 0, 0, 0.5),
+                        0 4px 14px -2px rgba(96, 165, 250, 0.35);
+  --lct-trigger-ring: rgba(96, 165, 250, 0.4);
+}
+
+.lct-trigger {
+  all: initial;
+  position: fixed;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 2147483647;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.lct-trigger-chip {
+  position: relative;
+  box-sizing: border-box;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: var(--lct-trigger-bg);
+  border: 1px solid var(--lct-trigger-border);
+  box-shadow: var(--lct-trigger-shadow);
+  transform-origin: top left;
+  /* backwards：入场结束后不再占用 transform，触发/离场的缩放才能生效 */
+  animation: lct-trigger-in 180ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  transition: transform 140ms cubic-bezier(0.16, 1, 0.3, 1),
+              background 140ms ease, border-color 140ms ease;
+}
+
+.lct-trigger[data-h="left"] .lct-trigger-chip { transform-origin: top right; }
+.lct-trigger[data-v="up"] .lct-trigger-chip { transform-origin: bottom left; }
+.lct-trigger[data-h="left"][data-v="up"] .lct-trigger-chip { transform-origin: bottom right; }
+
+.lct-trigger-svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+  overflow: visible;
+}
+
+.lct-trigger-stop-a { stop-color: var(--lct-trigger-from); }
+.lct-trigger-stop-b { stop-color: var(--lct-trigger-to); }
+
+.lct-trigger-glyph {
+  fill: url(#lct-trigger-grad);
+  transition: fill 140ms ease;
+}
+
+.lct-trigger-glyph-sm {
+  opacity: 0.75;
+}
+
+/* 碰到：方块填满强调色、星变白、轻微放大，并向外扩一圈涟漪 */
+.lct-trigger-fired .lct-trigger-chip {
+  background: linear-gradient(135deg, var(--lct-trigger-fired-from), var(--lct-trigger-fired-to));
+  border-color: transparent;
+  transform: scale(1.12);
+}
+
+.lct-trigger-fired .lct-trigger-glyph {
+  fill: #FFFFFF;
+}
+
+.lct-trigger-fired .lct-trigger-chip::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: 8px;
+  box-shadow: 0 0 0 0 var(--lct-trigger-ring);
+  animation: lct-trigger-ring 320ms ease-out forwards;
+}
+
+.lct-trigger-leaving .lct-trigger-chip {
+  opacity: 0;
+  transform: scale(0.85);
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+@keyframes lct-trigger-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes lct-trigger-ring {
+  to {
+    box-shadow: 0 0 0 9px rgba(59, 130, 246, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lct-trigger-chip,
+  .lct-trigger-fired .lct-trigger-chip::after {
+    animation: none;
+  }
+  .lct-trigger-fired .lct-trigger-chip,
+  .lct-trigger-leaving .lct-trigger-chip {
+    transform: none;
+  }
+}

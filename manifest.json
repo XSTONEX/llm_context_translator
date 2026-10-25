@@ -47,6 +47,7 @@
         "content-tts.js",
         "content-client.js",
         "content-panel.js",
+        "content-trigger.js",
         "content-selection.js",
         "content.js"
       ],

@@ -28,6 +28,7 @@ function init() {
   const els = {
     statusDot: document.getElementById('statusDot'),
     enableToggle: document.getElementById('enableToggle'),
+    triggerModeSelect: document.getElementById('triggerModeSelect'),
     wordsOnlyToggle: document.getElementById('wordsOnlyToggle'),
     langSelect: document.getElementById('langSelect'),
     ttsEnabledToggle: document.getElementById('ttsEnabledToggle'),
@@ -53,6 +54,11 @@ function init() {
   const ttsEnabledSwitch = els.ttsEnabledToggle && els.ttsEnabledToggle.closest('.toggle-switch');
   if (ttsEnabledSwitch) ttsEnabledSwitch.classList.add('no-transition');
 
+  const triggerModeKey = typeof TRIGGER_MODE_KEY !== 'undefined' ? TRIGGER_MODE_KEY : 'triggerMode';
+  const normalizeTrigger =
+    typeof normalizeTriggerMode === 'function'
+      ? normalizeTriggerMode
+      : (v) => (v === 'instant' || v === 'icon' ? v : 'icon');
   const ttsEnabledKey = typeof TTS_ENABLED_KEY !== 'undefined' ? TTS_ENABLED_KEY : 'ttsEnabled';
   const resolveTts =
     typeof resolveTtsEnabled === 'function' ? resolveTtsEnabled : (v) => v !== false;
@@ -99,7 +105,7 @@ function init() {
   });
 
   chrome.storage.local.get(
-    ['enabled', 'apiBase', 'selectedModel', 'sourceLangMode', 'targetLang', 'ttsPlayMode', themeKey, 'lookupHistory', 'favoriteLookups', 'wordsOnly', ttsEnabledKey],
+    ['enabled', 'apiBase', 'selectedModel', 'sourceLangMode', 'targetLang', 'ttsPlayMode', themeKey, 'lookupHistory', 'favoriteLookups', 'wordsOnly', ttsEnabledKey, triggerModeKey],
     (result) => {
       const enabled = result.enabled !== undefined ? result.enabled : true;
       const wordsOnly = Boolean(result.wordsOnly);
@@ -109,6 +115,7 @@ function init() {
 
       els.enableToggle.checked = enabled;
       if (els.wordsOnlyToggle) els.wordsOnlyToggle.checked = wordsOnly;
+      if (els.triggerModeSelect) els.triggerModeSelect.value = normalizeTrigger(result[triggerModeKey]);
       els.apiBaseInput.value = apiBase;
       els.langSelect.value = sourceLangMode;
       els.ttsPlayModeSelect.value = result.ttsPlayMode || 'off';
@@ -142,6 +149,12 @@ function init() {
       targetLang: els.langSelect.value === 'auto' ? 'en' : els.langSelect.value,
     });
   });
+
+  if (els.triggerModeSelect) {
+    els.triggerModeSelect.addEventListener('change', () => {
+      chrome.storage.local.set({ [triggerModeKey]: normalizeTrigger(els.triggerModeSelect.value) });
+    });
+  }
 
   if (els.ttsEnabledToggle) {
     els.ttsEnabledToggle.addEventListener('change', () => {
@@ -252,6 +265,9 @@ function init() {
     }
     if (changes[ttsEnabledKey]) {
       setTtsEnabled(resolveTts(changes[ttsEnabledKey].newValue));
+    }
+    if (changes[triggerModeKey] && els.triggerModeSelect) {
+      els.triggerModeSelect.value = normalizeTrigger(changes[triggerModeKey].newValue);
     }
     if (changes[themeKey]) {
       setThemeMode(changes[themeKey].newValue);

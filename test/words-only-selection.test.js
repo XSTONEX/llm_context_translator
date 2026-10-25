@@ -53,7 +53,8 @@ function loadSelection(storageData, selectedText) {
       storage: {
         local: {
           get(keys, callback) {
-            callback(storageData);
+            // 这些用例验证「选中即翻译」下的过滤；图标模式见 trigger-selection.test.js
+            callback({ triggerMode: 'instant', ...storageData });
           },
           set() {}
         },
@@ -115,6 +116,13 @@ function loadSelection(storageData, selectedText) {
       return true;
     },
     disconnectActivePort() {}
+  };
+  context.LCT.trigger = {
+    show() {},
+    hide() {},
+    containsEvent() {
+      return false;
+    }
   };
   context.LCT.tts = {
     setEnabled() {},

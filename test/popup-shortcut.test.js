@@ -52,6 +52,7 @@ function loadPopup() {
   const elements = {
     statusDot: createElement('statusDot'),
     enableToggle: createElement('enableToggle'),
+    triggerModeSelect: createElement('triggerModeSelect'),
     wordsOnlyToggle: createElement('wordsOnlyToggle'),
     langSelect: createElement('langSelect'),
     ttsEnabledToggle: createElement('ttsEnabledToggle'),
@@ -254,3 +255,18 @@ harness.elements.ttsEnabledToggle.checked = false;
 harness.elements.ttsEnabledToggle.dispatch('change');
 assert.equal(harness.storageSets[harness.storageSets.length - 1].ttsEnabled, false);
 assert.equal(harness.elements.ttsPlayModeSelect.disabled, true);
+
+// 触发方式: 未存储时默认「碰图标翻译」, 跟随存储变化, 修改后写回
+assert.equal(harness.elements.triggerModeSelect.value, 'icon');
+
+harness.storageChangeListeners[0](
+  {
+    triggerMode: { newValue: 'instant' }
+  },
+  'local'
+);
+assert.equal(harness.elements.triggerModeSelect.value, 'instant');
+
+harness.elements.triggerModeSelect.value = 'icon';
+harness.elements.triggerModeSelect.dispatch('change');
+assert.equal(harness.storageSets[harness.storageSets.length - 1].triggerMode, 'icon');

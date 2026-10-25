@@ -23,48 +23,82 @@
   function handleMouseUp(event) {
     if (!state.enabled) return;
     if (state.isDragging || state.isResizing) return;
-    if (isEventInsidePanel(event)) return;
+    if (isEventInsidePanel(event) || LCT.trigger.containsEvent(event)) return;
 
     clearTimeout(debounceTimer);
+    if (state.triggerMode === 'icon') {
+      // 图标只是 DOM，不发请求，松手就显示：等 300ms 防抖的话，顺势一滑会在图标出现前就划过去。
+      // 延到下一轮任务再读选区，双击/三击时以最后一次松手为准
+      const pointer = { x: event.clientX, y: event.clientY };
+      debounceTimer = setTimeout(() => processSelection(pointer), 0);
+      return;
+    }
     debounceTimer = setTimeout(() => processSelection(), constants.DEBOUNCE_DELAY);
   }
 
-  async function processSelection() {
+  // 每次松手递增；异步读设置期间若又松手，旧的这次作废
+  let selectionSeq = 0;
+
+  async function processSelection(pointer) {
+    const seq = ++selectionSeq;
     const selection = window.getSelection();
     const selectedText = selection ? selection.toString().trim() : '';
 
     if (!selectedText) {
+      LCT.trigger.hide();
       if (state.isVisible && !state.isPinned) LCT.panel.hidePanel();
       return;
     }
 
-    if (selectedText === state.currentText && state.isVisible) return;
+    if (selectedText === state.currentText && state.isVisible) {
+      LCT.trigger.hide();
+      return;
+    }
     if (!selection || selection.rangeCount === 0) return;
 
     const settings = await LCT.storage.getSettings();
+    if (seq !== selectionSeq) return;
     const lang = LCT.lang.resolve(settings.sourceLangMode, selectedText);
     if (settings.wordsOnly && !isWordOrPhrase(selectedText, lang)) {
+      LCT.trigger.hide();
       if (state.isVisible && !state.isPinned) LCT.panel.hidePanel();
       return;
     }
 
+    // 在松手这一刻记下选区：触发时网页可能已改掉选区，翻译的必须是用户看到的这段
     const range = selection.getRangeAt(0);
-    const rect = range.getBoundingClientRect();
-    const contextSentence = extractContextSentence(selection);
+    const snapshot = {
+      text: selectedText,
+      context: extractContextSentence(selection),
+      rect: range.getBoundingClientRect(),
+      model: settings.model,
+      lang
+    };
 
+    if (state.triggerMode === 'icon' && pointer) {
+      // 选中只是候选：未固定的旧面板先收起；固定面板保持原样，碰到图标才替换内容
+      if (state.isVisible && !state.isPinned) LCT.panel.hidePanel();
+      LCT.trigger.show(pointer, () => startLookup(snapshot));
+      return;
+    }
+
+    await startLookup(snapshot);
+  }
+
+  async function startLookup(snapshot) {
     const apiBase = await LCT.storage.getApiBase();
     const request = {
       id: ++state.activeRequestId,
-      text: selectedText,
-      context: contextSentence,
-      rect,
-      model: settings.model,
-      lang,
+      text: snapshot.text,
+      context: snapshot.context,
+      rect: snapshot.rect,
+      model: snapshot.model,
+      lang: snapshot.lang,
       apiBase,
       startTime: Date.now()
     };
 
-    state.currentText = selectedText;
+    state.currentText = snapshot.text;
     state.currentRequest = request;
     state.currentResponseData = null;
 
@@ -259,9 +293,10 @@
   }
 
   function init() {
-    chrome.storage.local.get(['enabled', TTS_ENABLED_KEY], (result) => {
+    chrome.storage.local.get(['enabled', TTS_ENABLED_KEY, TRIGGER_MODE_KEY], (result) => {
       state.enabled = result.enabled !== undefined ? result.enabled : true;
       LCT.tts.setEnabled(resolveTtsEnabled(result[TTS_ENABLED_KEY]));
+      state.triggerMode = normalizeTriggerMode(result[TRIGGER_MODE_KEY]);
     });
 
     chrome.storage.onChanged.addListener((changes, area) => {
@@ -270,6 +305,10 @@
       }
       if (area === 'local' && changes[TTS_ENABLED_KEY]) {
         LCT.tts.setEnabled(resolveTtsEnabled(changes[TTS_ENABLED_KEY].newValue));
+      }
+      if (area === 'local' && changes[TRIGGER_MODE_KEY]) {
+        state.triggerMode = normalizeTriggerMode(changes[TRIGGER_MODE_KEY].newValue);
+        if (state.triggerMode !== 'icon') LCT.trigger.hide({ immediate: true });
       }
     });
 

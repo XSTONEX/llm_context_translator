@@ -88,7 +88,8 @@ function loadContent(storageData, options = {}) {
         local: {
           get(keys, callback) {
             calls.storageGets.push(keys);
-            callback(storageData);
+            // 端到端用例走「选中即翻译」，选中后直接发请求
+            callback({ triggerMode: 'instant', ...storageData });
           },
           set() {}
         },
@@ -136,6 +137,13 @@ function loadContent(storageData, options = {}) {
     showProgressivePanel() {},
     forceCleanup() {},
     showToast() {}
+  };
+  context.LCT.trigger = {
+    show() {},
+    hide() {},
+    containsEvent() {
+      return false;
+    }
   };
   context.LCT.client = {
     startStreaming() {

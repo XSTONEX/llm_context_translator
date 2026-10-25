@@ -15,6 +15,7 @@
   let panelElement = null;
   let toastElement = null;
   let toastTimer = null;
+  let hideTimer = null;
   let themeMode = typeof DEFAULT_THEME_MODE !== 'undefined' ? DEFAULT_THEME_MODE : 'system';
   let themeMediaQuery = null;
   let themeListenersBound = false;
@@ -181,7 +182,7 @@
   }
 
   function getFallbackCSS() {
-    return '.lct-panel{all:initial;position:fixed;width:360px;max-height:480px;overflow-y:auto;background:#fff;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.1);border:1px solid #e5e7eb;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:14px;color:#1a1a1a;line-height:1.6;z-index:2147483647;display:none;box-sizing:border-box;padding:16px;}.lct-panel *{box-sizing:border-box;}';
+    return '.lct-panel{all:initial;position:fixed;width:360px;max-height:480px;overflow-y:auto;background:#fff;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.1);border:1px solid #e5e7eb;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:14px;color:#1a1a1a;line-height:1.6;z-index:2147483647;display:none;box-sizing:border-box;padding:16px;}.lct-panel *{box-sizing:border-box;}.lct-trigger{all:initial;position:fixed;width:32px;height:32px;display:flex;align-items:center;justify-content:center;pointer-events:auto;cursor:pointer;z-index:2147483647;}.lct-trigger-chip{width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:7px;background:#fff;border:1px solid #bfdbfe;box-shadow:0 2px 8px rgba(59,130,246,0.3);}.lct-trigger-svg{width:14px;height:14px;fill:#3b82f6;}.lct-trigger-glyph{fill:#3b82f6;}';
   }
 
   function ensurePanel() {
@@ -280,6 +281,9 @@
 
   function showProgressivePanel(selectionRect, request) {
     ensurePanel();
+    // 图标触发时可能刚关旧面板就立刻打开新面板：取消还没执行的收起，否则新面板会被它藏掉
+    clearTimeout(hideTimer);
+    hideTimer = null;
     const keepPinnedPosition = state.isPinned && state.isVisible;
     panelElement.innerHTML = '';
 
@@ -1243,7 +1247,9 @@
     panelElement.style.opacity = '0';
     panelElement.style.transform = 'scale(0.96) translateY(-4px)';
 
-    setTimeout(() => {
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => {
+      hideTimer = null;
       if (panelElement) panelElement.style.display = 'none';
       state.isVisible = false;
       state.isPinned = false;
@@ -1263,6 +1269,7 @@
     LCT.selection.setDebounceTimer(null);
     LCT.client.disconnectActivePort();
     LCT.tts.cleanup();
+    if (LCT.trigger) LCT.trigger.hide({ immediate: true });
 
     if (panelElement) {
       panelElement.style.transition = 'none';
