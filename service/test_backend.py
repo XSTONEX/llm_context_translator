@@ -9,6 +9,7 @@ import storage
 from app import (
     audio_media_type,
     build_chat_payload,
+    check_access_token,
     check_rate_limit,
     deerapi_request_kwargs,
     ensure_done_event_fields,
@@ -204,22 +205,98 @@ class LlmProviderSettingsTests(unittest.TestCase):
 
 class AccessTokenTests(unittest.TestCase):
     def test_access_token_not_required_when_unconfigured(self):
-        self.assertIsNone(require_access_token(None, configured_token=""))
+        self.assertIsNone(check_access_token(None, configured_token=""))
 
     def test_access_token_required_when_configured(self):
         with self.assertRaises(HTTPException) as ctx:
-            require_access_token(None, configured_token="secret")
+            check_access_token(None, configured_token="secret")
 
         self.assertEqual(ctx.exception.status_code, 401)
 
     def test_access_token_rejects_wrong_value(self):
         with self.assertRaises(HTTPException) as ctx:
-            require_access_token("wrong", configured_token="secret")
+            check_access_token("wrong", configured_token="secret")
 
         self.assertEqual(ctx.exception.status_code, 401)
 
     def test_access_token_accepts_matching_value(self):
-        self.assertIsNone(require_access_token("secret", configured_token="secret"))
+        self.assertIsNone(check_access_token("secret", configured_token="secret"))
+
+    def test_non_ascii_token_is_rejected_not_crashing(self):
+        with self.assertRaises(HTTPException) as ctx:
+            check_access_token("sécret", configured_token="secret")
+        self.assertEqual(ctx.exception.status_code, 401)
+
+    def test_dependency_reads_server_config_not_arguments(self):
+        with patch("app.LCT_ACCESS_TOKEN", "secret"):
+            with self.assertRaises(HTTPException):
+                require_access_token(None)
+            self.assertIsNone(require_access_token("secret"))
+        with patch("app.LCT_ACCESS_TOKEN", ""):
+            self.assertIsNone(require_access_token(None))
+
+
+class AccessTokenEndpointTests(unittest.TestCase):
+    """走真实路由：token 只能来自请求头，query 参数改变不了服务端配置"""
+
+    def setUp(self):
+        from fastapi.testclient import TestClient
+
+        from app import RATE_LIMIT_BUCKETS, app
+
+        RATE_LIMIT_BUCKETS.clear()
+        tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+        tmp.close()
+        self.db_path = tmp.name
+        self._orig_path = storage.LCT_DB_PATH
+        storage.LCT_DB_PATH = self.db_path
+        storage.init_db()
+        self.client = TestClient(app)
+
+    def tearDown(self):
+        from app import RATE_LIMIT_BUCKETS
+
+        RATE_LIMIT_BUCKETS.clear()
+        storage.LCT_DB_PATH = self._orig_path
+        os.unlink(self.db_path)
+
+    def _status(self, method, url, headers=None, token="secret", **kwargs):
+        with patch("app.LCT_ACCESS_TOKEN", token):
+            return self.client.request(method, url, headers=headers or {}, **kwargs).status_code
+
+    def test_header_token_is_required(self):
+        self.assertEqual(self._status("GET", "/api/favorites"), 401)
+        self.assertEqual(self._status("GET", "/api/favorites", {"X-LCT-Token": "wrong"}), 401)
+        self.assertEqual(self._status("GET", "/api/favorites", {"X-LCT-Token": "secret"}), 200)
+
+    def test_query_param_cannot_override_configured_token(self):
+        for url in ["/api/favorites?configured_token=x", "/api/favorites?configured_token="]:
+            self.assertEqual(self._status("GET", url, {"X-LCT-Token": "x"}), 401, url)
+            self.assertEqual(self._status("GET", url), 401, url)
+        # POST 接口同样挡在鉴权上，不会走到 TTS
+        self.assertEqual(
+            self._status(
+                "POST", "/api/tts?configured_token=x", {"X-LCT-Token": "x"}, json={"text": "apple"}
+            ),
+            401,
+        )
+
+    def test_non_ascii_header_gets_401_not_500(self):
+        headers = {"X-LCT-Token": "sécret".encode("latin-1")}
+        self.assertEqual(self._status("GET", "/api/favorites", headers), 401)
+
+    def test_unconfigured_token_keeps_backend_open(self):
+        self.assertEqual(self._status("GET", "/api/favorites", token=""), 200)
+
+    def test_openapi_does_not_expose_token_param_or_value(self):
+        from app import app
+
+        app.openapi_schema = None
+        with patch("app.LCT_ACCESS_TOKEN", "secret-value-should-not-leak"):
+            schema_text = self.client.get("/openapi.json").text
+        app.openapi_schema = None
+        self.assertNotIn("configured_token", schema_text)
+        self.assertNotIn("secret-value-should-not-leak", schema_text)
 
 
 class RateLimitTests(unittest.TestCase):

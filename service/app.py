@@ -166,15 +166,25 @@ app.add_middleware(
 RATE_LIMIT_BUCKETS: dict[str, Deque[float]] = defaultdict(deque)
 
 
-def require_access_token(
-    x_lct_token: Optional[str] = Header(default=None),
-    configured_token: str = LCT_ACCESS_TOKEN,
-) -> None:
-    """Require a shared extension token when LCT_ACCESS_TOKEN is configured."""
+def check_access_token(x_lct_token: Optional[str], configured_token: str) -> None:
+    """配置了 token 时，要求请求头里的 token 与之一致；未配置则不鉴权。"""
     if not configured_token:
         return
-    if not x_lct_token or not secrets.compare_digest(x_lct_token, configured_token):
+    # 按字节比较：str 版 compare_digest 遇到非 ASCII 会抛 TypeError，乱码请求头会变成 500
+    if not x_lct_token or not secrets.compare_digest(
+        x_lct_token.encode("utf-8"), configured_token.encode("utf-8")
+    ):
         raise HTTPException(status_code=401, detail="Invalid access token")
+
+
+def require_access_token(x_lct_token: Optional[str] = Header(default=None)) -> None:
+    """FastAPI 依赖：token 只从 X-LCT-Token 请求头取，配置值读服务端的 LCT_ACCESS_TOKEN。
+
+    配置值不能写成这个函数的参数：FastAPI 会把它当成 query 参数，
+    客户端带 ?configured_token=x 再配 X-LCT-Token: x 就能绕过鉴权，
+    /openapi.json 还会把真实 token 当默认值公开出去。
+    """
+    check_access_token(x_lct_token, LCT_ACCESS_TOKEN)
 
 
 def check_rate_limit(
