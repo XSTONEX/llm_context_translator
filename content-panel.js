@@ -18,6 +18,9 @@
   let hideTimer = null;
   let themeMode = typeof DEFAULT_THEME_MODE !== 'undefined' ? DEFAULT_THEME_MODE : 'system';
   let themeMediaQuery = null;
+  // 用户拖出来的尺寸：width 是宽度，height 作为最大高度用，内容短时面板仍随内容收缩
+  const PANEL_SIZE_KEY = 'panelSize';
+  let panelSize = null;
   let themeListenersBound = false;
   let copyWordFields = typeof getDefaultCopyWordFields === 'function'
     ? getDefaultCopyWordFields()
@@ -93,6 +96,9 @@
         if (changes[copyKey]) {
           applyCopyWordFields(changes[copyKey].newValue);
         }
+        if (changes[PANEL_SIZE_KEY]) {
+          panelSize = normalizePanelSize(changes[PANEL_SIZE_KEY].newValue);
+        }
       });
     } catch (e) {
       // storage API 在部分测试环境可能不可用
@@ -131,6 +137,7 @@
     applyThemeToHost();
     loadAndApplyTheme();
     loadCopyWordFields();
+    loadPanelSize();
     bindThemeListeners();
     loadStyles();
   }
@@ -156,6 +163,46 @@
         resolve(copyWordFields);
       }
     });
+  }
+
+  function normalizePanelSize(value) {
+    if (!value || typeof value !== 'object') return null;
+    const width = Number(value.width);
+    const height = Number(value.height);
+    if (!Number.isFinite(width) || !Number.isFinite(height)) return null;
+    return {
+      width: Math.max(constants.PANEL_MIN_WIDTH, Math.round(width)),
+      height: Math.max(constants.PANEL_MIN_HEIGHT, Math.round(height))
+    };
+  }
+
+  function loadPanelSize() {
+    try {
+      chrome.storage.local.get([PANEL_SIZE_KEY], (result) => {
+        panelSize = normalizePanelSize(result && result[PANEL_SIZE_KEY]);
+      });
+    } catch (e) {
+      // storage API 在部分测试环境可能不可用
+    }
+  }
+
+  function savePanelSize(size) {
+    panelSize = size;
+    try {
+      chrome.storage.local.set({ [PANEL_SIZE_KEY]: size });
+    } catch (e) {
+      // storage API 在部分测试环境可能不可用
+    }
+  }
+
+  // 记住的尺寸可能来自更大的窗口，打开时按当前视口收一下
+  function applyPanelSize() {
+    const gap = constants.PANEL_GAP * 2;
+    const width = panelSize ? panelSize.width : constants.PANEL_WIDTH;
+    const maxHeight = panelSize ? panelSize.height : 480;
+    panelElement.style.width = Math.min(width, Math.max(constants.PANEL_MIN_WIDTH, window.innerWidth - gap)) + 'px';
+    panelElement.style.height = '';
+    panelElement.style.maxHeight = Math.min(maxHeight, Math.max(constants.PANEL_MIN_HEIGHT, window.innerHeight - gap)) + 'px';
   }
 
   async function loadStyles() {
@@ -310,9 +357,7 @@
 
     panelElement.style.opacity = '0';
     panelElement.style.transform = 'scale(0.96) translateY(-4px)';
-    panelElement.style.width = constants.PANEL_WIDTH + 'px';
-    panelElement.style.height = '';
-    panelElement.style.maxHeight = '480px';
+    applyPanelSize();
     requestAnimationFrame(() => {
       const pos = calculatePosition(selectionRect);
       panelElement.style.left = pos.left + 'px';
@@ -1461,6 +1506,7 @@
     const startH = panelRect.height;
     const panelLeft = panelRect.left;
     const panelTop = panelRect.top;
+    let finalSize = null;
 
     function onResizeMove(moveEvent) {
       if (!state.isResizing) return;
@@ -1474,9 +1520,11 @@
       newW = Math.min(newW, vpW - panelLeft);
       newH = Math.min(newH, vpH - panelTop);
 
+      // 拖的是最大高度而不是固定高度：内容不够高时面板贴着内容，不会在底部留一大片空白
       panelElement.style.width = newW + 'px';
-      panelElement.style.height = newH + 'px';
-      panelElement.style.maxHeight = 'none';
+      panelElement.style.height = '';
+      panelElement.style.maxHeight = newH + 'px';
+      finalSize = { width: Math.round(newW), height: Math.round(newH) };
     }
 
     function onResizeEnd() {
@@ -1484,6 +1532,7 @@
       document.removeEventListener('mousemove', onResizeMove);
       document.removeEventListener('mouseup', onResizeEnd);
       document.body.style.userSelect = '';
+      if (finalSize) savePanelSize(finalSize);
     }
 
     document.addEventListener('mousemove', onResizeMove);
