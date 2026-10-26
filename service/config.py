@@ -30,6 +30,11 @@ TTS_PROVIDER: str = (os.getenv("TTS_PROVIDER", "gptsapi") or "gptsapi").strip().
 # 线上锁定的音色; 未选定时默认 nova
 TTS_VOICE: str = (os.getenv("TTS_VOICE", "nova") or "nova").strip()
 
+# 有道词典发音: 单个英文单词优先用它(免费, 多为真人录音), 拿不到或是词组/句子时走 TTS_PROVIDER
+YOUDAO_TTS_ENABLED: bool = (os.getenv("YOUDAO_TTS_ENABLED", "1") or "1").strip().lower() not in ("0", "false", "no", "off")
+# 口音: us(美音, 默认) | uk(英音)
+YOUDAO_TTS_ACCENT: str = "uk" if (os.getenv("YOUDAO_TTS_ACCENT", "") or "").strip().lower() == "uk" else "us"
+
 # 生词本 SQLite 数据库路径（默认放在 service/data/ 下，已被 .gitignore 忽略）
 LCT_DB_PATH: str = os.getenv(
     "LCT_DB_PATH", str(Path(__file__).parent / "data" / "favorites.db")

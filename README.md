@@ -45,6 +45,8 @@ uv run uvicorn app:app --reload
 DEEPSEEK_API_KEY=your_deepseek_key # 默认模型 deepseek-flash 必填
 SILICONFLOW_API_KEY=your_api_key   # 硅基流动上的其他模型
 LLM_API_BASE_URL=https://api.siliconflow.cn/v1
+YOUDAO_TTS_ENABLED=1              # 单个英文单词先取有道词典发音（免费），词组/句子或取不到时走 TTS_PROVIDER
+YOUDAO_TTS_ACCENT=us              # us 美音 | uk 英音
 TTS_PROVIDER=gptsapi              # gptsapi（国内直连）或 deerapi
 TTS_VOICE=nova                    # 锁定音色
 GPTSAPI_KEY=your_tts_key          # 可选，TTS 发音

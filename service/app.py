@@ -4,6 +4,7 @@ import logging
 import re
 import secrets
 import time
+import unicodedata
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Deque, List, Optional
@@ -29,6 +30,8 @@ from config import (
     SILICONFLOW_API_KEY,
     TTS_PROVIDER,
     TTS_VOICE,
+    YOUDAO_TTS_ACCENT,
+    YOUDAO_TTS_ENABLED,
     cos_configured,
 )
 import storage
@@ -493,25 +496,143 @@ def resolve_tts_voice(requested: str = "") -> str:
     return (TTS_VOICE or requested or "nova").strip()
 
 
-async def generate_tts_bytes(text: str, voice: str = "") -> bytes:
-    """调用当前 TTS 供应商生成语音二进制; 失败抛 HTTPException"""
-    settings = tts_provider_settings()
-    if not settings["key"]:
-        raise HTTPException(status_code=500, detail=f"{TTS_PROVIDER} TTS key 未配置")
+# ---------- 有道词典发音（免费，不需要 key） ----------
+
+YOUDAO_DICTVOICE_URL = "https://dict.youdao.com/dictvoice"
+# 阿里云到有道实测 80~150ms，2s 足够；超时或连不上时暂停有道一段时间，免得每个词都白等
+YOUDAO_TIMEOUT = aiohttp.ClientTimeout(total=2)
+YOUDAO_COOLDOWN_SECONDS = 60
+_youdao_skip_until = 0.0
+# 选区两端常带的标点。有道对 "apple." 给的是机器合成音、对 "(apple)" 直接 500，查询前先剥掉。
+# 开头不剥 "."，免得 ".NET" 变成 "NET"；末尾的 "." 见 youdao_word
+_YOUDAO_STRIP_HEAD = "\"'“”‘’([{<«"
+_YOUDAO_STRIP_TAIL = "\"'“”‘’)]}>»,;:!?…"
+# 一个词内允许的字符：拉丁字母（含 café、naïve 这类变音字母）、数字、撇号、连字符、&、+、.
+_YOUDAO_WORD_RE = re.compile(r"^[A-Za-z0-9À-ÖØ-öø-ÿ'’&+.\-]+$")
+_YOUDAO_LETTER_RE = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ]")
+
+
+def youdao_word(text: str) -> Optional[str]:
+    """单个英文单词才走有道，返回剥掉两端标点后的查询词；词组、句子、日语等返回 None"""
+    words = unicodedata.normalize("NFC", text or "").split()
+    if len(words) != 1:
+        return None
+    word = words[0].lstrip(_YOUDAO_STRIP_HEAD).rstrip(_YOUDAO_STRIP_TAIL)
+    # 末尾的 "." 只在词里没有别的 "." 时才剥："apple." → apple，"U.S.A." / "a.m." 原样
+    # （有道 U.S.A. 有录音、U.S.A 是 500）
+    stem = word.rstrip(".")
+    if "." not in stem:
+        word = stem
+    if not _YOUDAO_WORD_RE.match(word) or not _YOUDAO_LETTER_RE.search(word):
+        return None
+    return word
+
+
+def _is_mp3_frame(data: bytes) -> bool:
+    """MPEG Layer III 帧同步头（版本位不是保留值）"""
+    return (
+        data[0] == 0xFF
+        and data[1] & 0xE0 == 0xE0
+        and data[1] & 0x06 == 0x02
+        and data[1] & 0x18 != 0x08
+    )
+
+
+def is_audio_bytes(data: bytes) -> bool:
+    """ID3 / RIFF(WAV) / MP3 帧头；有道取不到音频时回的是 JSON"""
+    if len(data) < 4:
+        return False
+    return data[:3] == b"ID3" or data[:4] == b"RIFF" or _is_mp3_frame(data)
+
+
+def is_youdao_machine_audio(data: bytes) -> bool:
+    """有道的机器合成音：没有 ID3 头的 MPEG-2/2.5 裸帧（24kHz/16kHz）。
+
+    实测词典录音都带 ID3 头、或是 44.1/48kHz 的 MPEG-1、或是 WAV；
+    词典没收录的词（ChatGPT、Kubernetes）和大写形式（Warning、iPhone）才回这种。
+    """
+    return len(data) >= 4 and _is_mp3_frame(data) and data[1] & 0x18 != 0x18
+
+
+def audio_media_type(data: bytes) -> str:
+    """有道个别词（如 set）回的是 WAV，响应头却写 audio/mpeg，按文件头纠正"""
+    return "audio/wav" if data[:4] == b"RIFF" else "audio/mpeg"
+
+
+async def fetch_youdao_audio(word: str) -> Optional[bytes]:
+    """请求有道词典发音；500 / 非音频 / 超时都返回 None，由调用方回退到 TTS 供应商"""
+    global _youdao_skip_until
+    if time.monotonic() < _youdao_skip_until:
+        return None
+    params = {"audio": word, "type": "1" if YOUDAO_TTS_ACCENT == "uk" else "2"}
+    try:
+        async with app.state.session.get(
+            YOUDAO_DICTVOICE_URL, params=params, timeout=YOUDAO_TIMEOUT
+        ) as resp:
+            if resp.status != 200:
+                log.info("youdao tts miss status=%s word=%s", resp.status, word)
+                return None
+            data = await resp.read()
+    except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+        _youdao_skip_until = time.monotonic() + YOUDAO_COOLDOWN_SECONDS
+        log.info(
+            "youdao tts failed word=%s err=%r, skip youdao for %ss",
+            word,
+            e,
+            YOUDAO_COOLDOWN_SECONDS,
+        )
+        return None
+    if not is_audio_bytes(data):
+        log.info("youdao tts non-audio word=%s bytes=%s", word, len(data))
+        return None
+    return data
+
+
+async def fetch_youdao_word_audio(word: str) -> Optional[bytes]:
+    """取一个词的有道发音，优先词典录音。
+
+    大写形式（句首的 Warning、iPhone）有道常只给机器合成音或 500，而小写有录音，
+    这时再按小写取一次；小写也没有录音就用原形的结果。专名先按原形取，所以 Nietzsche、Polish 不受影响。
+    """
+    audio = await fetch_youdao_audio(word)
+    lower = word.lower()
+    if lower == word or (audio and not is_youdao_machine_audio(audio)):
+        return audio
+    lower_audio = await fetch_youdao_audio(lower)
+    if lower_audio and not is_youdao_machine_audio(lower_audio):
+        return lower_audio
+    return audio or lower_audio
+
+
+async def synthesize_tts(text: str, voice: str = "") -> tuple[bytes, str]:
+    """生成语音：单个英文单词先取有道词典发音，取不到或是词组/句子时调 TTS 供应商。
+
+    返回 (音频二进制, 实际音色)，音色是 youdao-us / youdao-uk 或 TTS 音色；失败抛 HTTPException
+    """
     if len(text) > MAX_TTS_CHARS:
         raise HTTPException(
             status_code=413, detail=f"TTS 文本过长（上限 {MAX_TTS_CHARS} 字符）"
         )
+    word = youdao_word(text) if YOUDAO_TTS_ENABLED else None
+    if word:
+        audio = await fetch_youdao_word_audio(word)
+        if audio:
+            return audio, f"youdao-{YOUDAO_TTS_ACCENT}"
+
+    settings = tts_provider_settings()
+    if not settings["key"]:
+        raise HTTPException(status_code=500, detail=f"{TTS_PROVIDER} TTS key 未配置")
 
     url = f"{settings['base_url'].rstrip('/')}/audio/speech"
     headers = {
         "Authorization": f"Bearer {settings['key']}",
         "Content-Type": "application/json",
     }
+    resolved_voice = resolve_tts_voice(voice)
     payload = {
         "model": settings["model"],
         "input": text,
-        "voice": resolve_tts_voice(voice),
+        "voice": resolved_voice,
     }
 
     try:
@@ -524,9 +645,15 @@ async def generate_tts_bytes(text: str, voice: str = "") -> bytes:
                     status_code=502,
                     detail=f"TTS API 返回 {resp.status}: {error_text[:200]}",
                 )
-            return await resp.read()
+            return await resp.read(), resolved_voice
     except aiohttp.ClientError as e:
         raise HTTPException(status_code=502, detail=f"TTS 服务请求失败: {str(e)}")
+
+
+async def generate_tts_bytes(text: str, voice: str = "") -> bytes:
+    """只要音频二进制、不关心音色来源时用；规则同 synthesize_tts"""
+    audio, _ = await synthesize_tts(text, voice)
+    return audio
 
 
 async def ensure_favorite_audio(
@@ -552,10 +679,10 @@ async def ensure_favorite_audio(
             storage.upsert_favorite(user_id, item)
             return item
 
-        audio = await generate_tts_bytes(query, voice)
-        await asyncio.to_thread(upload_audio, key, audio)
+        audio, audio_voice = await synthesize_tts(query, voice)
+        await asyncio.to_thread(upload_audio, key, audio, audio_media_type(audio))
         item["audioKey"] = key
-        item["audioVoice"] = voice
+        item["audioVoice"] = audio_voice
         storage.upsert_favorite(user_id, item)
     except Exception:
         log.exception("ensure_favorite_audio failed query=%s", query)
@@ -567,11 +694,11 @@ async def ensure_favorite_audio(
     dependencies=[Depends(require_rate_limit), Depends(require_access_token)],
 )
 async def text_to_speech(req: TTSRequest):
-    """调用 DeerAPI 生成语音，返回 audio/mpeg 二进制流"""
+    """生成语音（单个英文单词优先有道），返回音频二进制流"""
     audio_data = await generate_tts_bytes(req.text, req.voice)
     return Response(
         content=audio_data,
-        media_type="audio/mpeg",
+        media_type=audio_media_type(audio_data),
         headers={"Content-Disposition": "inline"},
     )
 
@@ -650,7 +777,7 @@ async def get_favorite_audio(
 
     return Response(
         content=data,
-        media_type="audio/mpeg",
+        media_type=audio_media_type(data),
         headers={
             "Content-Disposition": "inline",
             "Cache-Control": "private, max-age=86400",
