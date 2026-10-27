@@ -42,7 +42,8 @@
   async function processSelection(pointer) {
     const seq = ++selectionSeq;
     const selection = window.getSelection();
-    const selectedText = selection ? selection.toString().trim() : '';
+    const rawText = selection ? selection.toString() : '';
+    const selectedText = collapseWhitespace(rawText);
 
     if (!selectedText) {
       LCT.trigger.hide();
@@ -69,7 +70,7 @@
     const range = selection.getRangeAt(0);
     const snapshot = {
       text: selectedText,
-      context: extractContextSentence(selection),
+      context: extractContext(range, rawText),
       rect: range.getBoundingClientRect(),
       model: settings.model,
       lang
@@ -244,28 +245,60 @@
   }
 
 
-  function extractContextSentence(selection) {
+  // 网页源码的换行缩进、跨段的 \n\n 都压成一个空格；日文换行两侧是全角字符时直接拼上
+  function collapseWhitespace(text) {
+    return text
+      .replace(/([\u3001-\u30ff\u3400-\u9fff\uff01-\uffef])\s*\n\s*(?=[\u3001-\u30ff\u3400-\u9fff\uff01-\uffef])/g, '$1')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  const CONTEXT_SIDE_LIMIT = 300;
+  // 句末：英文标点（可带右引号/括号）后面是到头，或空白 + 大写/数字开头（避开 U.S. spends、3.14）；中日文标点直接算
+  const SENTENCE_END = /[.?!]['"’”)\]]*(?=\s+['"‘“(\[]*[A-Z0-9]|\s*$)|[。？！]/g;
+
+  // 选区所在的块级元素（段落 / 列表项 / 单元格…）；文字直接挂在 body 下时不取上下文
+  function closestBlock(node) {
+    let el = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+    while (el && el !== document.body && el !== document.documentElement) {
+      const display = getComputedStyle(el).display;
+      if (display !== 'inline' && display !== 'contents') return el;
+      el = el.parentElement;
+    }
+    return null;
+  }
+
+  // 上下文 = 选区前补到句首 + 选区全文 + 选区后补到句末（两侧各不超过 CONTEXT_SIDE_LIMIT 字）。
+  // 必须完整包含选区：只给其中一句的话，LLM 会以为用户只想翻那一句
+  function extractContext(range, rawText) {
     try {
-      const anchorNode = selection.anchorNode;
-      if (!anchorNode) return '';
-
-      const parentEl =
-        anchorNode.nodeType === Node.TEXT_NODE
-          ? anchorNode.parentElement
-          : anchorNode;
-      if (!parentEl) return '';
-
-      const fullText = parentEl.textContent || '';
-      if (!fullText.trim()) return '';
-
-      const selectedText = selection.toString().trim();
-      const sentences = fullText.split(/(?<=[.?!。？！\n])\s*/);
-
-      for (const sentence of sentences) {
-        if (sentence.includes(selectedText)) return sentence.trim();
+      let before = '';
+      const startBlock = closestBlock(range.startContainer);
+      if (startBlock) {
+        const head = document.createRange();
+        head.setStart(startBlock, 0);
+        head.setEnd(range.startContainer, range.startOffset);
+        before = head.toString().slice(-CONTEXT_SIDE_LIMIT);
+        // 带上选区开头几个字再判断：before 以 "U.S. " 结尾时要看选区是不是小写开头
+        let cut = -1;
+        for (const match of (before + rawText.slice(0, 8)).matchAll(SENTENCE_END)) {
+          if (match.index < before.length) cut = match.index + match[0].length;
+        }
+        if (cut >= 0) before = before.slice(cut);
       }
 
-      return fullText.trim().slice(0, 500);
+      let after = '';
+      const endBlock = closestBlock(range.endContainer);
+      if (endBlock && !/[.?!。？！]["'”’)\]]*$/.test(rawText.trim())) {
+        const tail = document.createRange();
+        tail.setStart(range.endContainer, range.endOffset);
+        tail.setEnd(endBlock, endBlock.childNodes.length);
+        after = tail.toString().slice(0, CONTEXT_SIDE_LIMIT);
+        const match = after.match(new RegExp(SENTENCE_END.source));
+        if (match) after = after.slice(0, match.index + match[0].length);
+      }
+
+      return collapseWhitespace(before + rawText + after);
     } catch {
       return '';
     }

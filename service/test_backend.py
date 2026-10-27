@@ -12,12 +12,12 @@ from app import (
     check_access_token,
     check_rate_limit,
     deerapi_request_kwargs,
-    ensure_done_event_fields,
     generate_tts_bytes,
     gptsapi_request_kwargs,
     is_audio_bytes,
     is_youdao_machine_audio,
     llm_provider_settings,
+    normalize_stream_event,
     require_access_token,
     resolve_user_id,
     tts_configured,
@@ -94,7 +94,7 @@ class DoneEventFieldsTests(unittest.TestCase):
         # 解析器主路径的 done 带 LLM 原始输出，可能缺 query/isWord 等字段
         event = {"type": "done", "data": {"translation": "你好"}}
 
-        result = ensure_done_event_fields(event, EnglishStrategy(), "hello world you", False)
+        result = normalize_stream_event(event, EnglishStrategy(), "hello world you", False)
 
         self.assertEqual(result["data"]["query"], "hello world you")
         self.assertFalse(result["data"]["isWord"])
@@ -104,14 +104,38 @@ class DoneEventFieldsTests(unittest.TestCase):
     def test_non_done_events_pass_through_unchanged(self):
         event = {"type": "field", "name": "query", "value": "hello"}
 
-        result = ensure_done_event_fields(event, EnglishStrategy(), "hello", True)
+        result = normalize_stream_event(event, EnglishStrategy(), "hello", True)
 
         self.assertEqual(result, {"type": "field", "name": "query", "value": "hello"})
+
+    def test_sentence_query_field_uses_selected_text(self):
+        # LLM 照抄长段落时可能只抄第一句，面板原文必须是用户选中的全文
+        text = "First sentence here. Second sentence there."
+        event = {"type": "field", "name": "query", "value": "First sentence here."}
+
+        result = normalize_stream_event(event, EnglishStrategy(), text, False)
+
+        self.assertEqual(result["value"], text)
+
+    def test_sentence_done_query_uses_selected_text(self):
+        text = "First sentence here. Second sentence there."
+        event = {"type": "done", "data": {"query": "First sentence here.", "isWord": False}}
+
+        result = normalize_stream_event(event, JapaneseStrategy(), text, False)
+
+        self.assertEqual(result["data"]["query"], text)
+
+    def test_word_query_keeps_llm_value(self):
+        event = {"type": "done", "data": {"query": "run", "isWord": True}}
+
+        result = normalize_stream_event(event, EnglishStrategy(), "running,", True)
+
+        self.assertEqual(result["data"]["query"], "run")
 
     def test_done_event_with_non_dict_data_passes_through(self):
         event = {"type": "done", "data": None}
 
-        result = ensure_done_event_fields(event, EnglishStrategy(), "hello", True)
+        result = normalize_stream_event(event, EnglishStrategy(), "hello", True)
 
         self.assertIsNone(result["data"])
 

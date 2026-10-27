@@ -64,7 +64,11 @@ class EnglishStrategy(LanguageStrategy):
         return f"单词/文本：{selected_text}"
 
     def ensure_response_fields(self, data: dict, selected_text: str, word_mode: bool) -> dict:
-        data.setdefault("query", selected_text)
+        if word_mode:
+            data.setdefault("query", selected_text)
+        else:
+            # 句子以用户原文为准，不信 LLM 的照抄（长段落可能只抄了第一句）
+            data["query"] = selected_text
         data.setdefault("isWord", word_mode)
         if word_mode:
             data.setdefault("phonetic", "")
@@ -111,7 +115,11 @@ class JapaneseStrategy(LanguageStrategy):
         return f"日本語テキスト：{selected_text}"
 
     def ensure_response_fields(self, data: dict, selected_text: str, word_mode: bool) -> dict:
-        data.setdefault("query", selected_text)
+        if word_mode:
+            data.setdefault("query", selected_text)
+        else:
+            # 句子以用户原文为准，不信 LLM 的照抄（长段落可能只抄了第一句）
+            data["query"] = selected_text
         data.setdefault("isWord", word_mode)
         if word_mode:
             data.setdefault("kana", "")

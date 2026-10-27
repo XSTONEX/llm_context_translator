@@ -202,6 +202,20 @@ async function run() {
     assertNoRequest(harness.calls);
   }
 
+  // 跨段 / 网页源码换行的选区：换行和缩进压成单个空格再发请求
+  {
+    const harness = loadSelection(
+      { enabled: true, triggerMode: 'icon' },
+      '  First paragraph ends here.\n\nSecond\n    paragraph starts.  '
+    );
+    await harness.select();
+    await harness.calls.triggerShow[0].onTrigger();
+    assert.equal(
+      harness.LCT.state.currentRequest.text,
+      'First paragraph ends here. Second paragraph starts.'
+    );
+  }
+
   // 未固定的旧面板：选新词时先收起，再出图标
   {
     const harness = loadSelection({ enabled: true, triggerMode: 'icon' }, 'serendipity');
