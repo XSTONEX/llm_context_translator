@@ -51,23 +51,19 @@
     hostElement.dataset.theme = resolve(themeMode);
   }
 
+  // 外观和复制内容都可按站点覆盖，从合并后的生效设置里取
+  function applySiteAppearance(settings) {
+    themeMode = settings.themeMode;
+    applyThemeToHost();
+    applyCopyWordFields(settings.copyWordFields);
+  }
+
   function loadAndApplyTheme() {
-    const key = typeof THEME_MODE_KEY !== 'undefined' ? THEME_MODE_KEY : 'themeMode';
     return new Promise((resolve) => {
-      try {
-        chrome.storage.local.get([key], (result) => {
-          const normalize =
-            typeof normalizeThemeMode === 'function'
-              ? normalizeThemeMode
-              : (mode) => (mode === 'light' || mode === 'dark' || mode === 'system' ? mode : 'system');
-          themeMode = normalize(result[key]);
-          applyThemeToHost();
-          resolve(themeMode);
-        });
-      } catch (e) {
-        applyThemeToHost();
+      LCT.settings.load((settings) => {
+        applySiteAppearance(settings);
         resolve(themeMode);
-      }
+      });
     });
   }
 
@@ -80,22 +76,11 @@
     if (themeListenersBound) return;
     themeListenersBound = true;
 
+    LCT.settings.onChange(applySiteAppearance);
+
     try {
       chrome.storage.onChanged.addListener((changes, area) => {
         if (area !== 'local') return;
-        const key = typeof THEME_MODE_KEY !== 'undefined' ? THEME_MODE_KEY : 'themeMode';
-        if (changes[key]) {
-          const normalize =
-            typeof normalizeThemeMode === 'function'
-              ? normalizeThemeMode
-              : (mode) => (mode === 'light' || mode === 'dark' || mode === 'system' ? mode : 'system');
-          themeMode = normalize(changes[key].newValue);
-          applyThemeToHost();
-        }
-        const copyKey = typeof COPY_WORD_FIELDS_KEY !== 'undefined' ? COPY_WORD_FIELDS_KEY : 'copyWordFields';
-        if (changes[copyKey]) {
-          applyCopyWordFields(changes[copyKey].newValue);
-        }
         if (changes[PANEL_SIZE_KEY]) {
           panelSize = normalizePanelSize(changes[PANEL_SIZE_KEY].newValue);
         }
@@ -136,7 +121,6 @@
 
     applyThemeToHost();
     loadAndApplyTheme();
-    loadCopyWordFields();
     loadPanelSize();
     bindThemeListeners();
     loadStyles();
@@ -149,20 +133,6 @@
     if (state.currentResponseData) {
       setCopyButtonReady(Boolean(getCopyableText(state.currentResponseData)));
     }
-  }
-
-  function loadCopyWordFields() {
-    const copyKey = typeof COPY_WORD_FIELDS_KEY !== 'undefined' ? COPY_WORD_FIELDS_KEY : 'copyWordFields';
-    return new Promise((resolve) => {
-      try {
-        chrome.storage.local.get([copyKey], (result) => {
-          applyCopyWordFields(result[copyKey]);
-          resolve(copyWordFields);
-        });
-      } catch (e) {
-        resolve(copyWordFields);
-      }
-    });
   }
 
   function normalizePanelSize(value) {
@@ -205,6 +175,31 @@
     panelElement.style.maxHeight = Math.min(maxHeight, Math.max(constants.PANEL_MIN_HEIGHT, window.innerHeight - gap)) + 'px';
   }
 
+  // Shadow DOM 里的 @font-face 不生效，字体要注册到 document.fonts 才能给面板用；
+  // 用字节而不是 URL 建 FontFace，不受网页 CSP 的 font-src 限制。只在第一次弹面板时加载
+  const PANEL_FONTS = [
+    { family: 'LCT Alegreya', file: 'fonts/Alegreya-wght.woff2', descriptors: { weight: '400 900', style: 'normal' } },
+    { family: 'LCT Alegreya', file: 'fonts/Alegreya-Italic-wght.woff2', descriptors: { weight: '400 900', style: 'italic' } },
+    { family: 'LCT ZCOOL XiaoWei', file: 'fonts/ZCOOLXiaoWei-subset.woff2', descriptors: {} }
+  ];
+  let panelFontsRequested = false;
+
+  function loadPanelFonts() {
+    if (panelFontsRequested) return;
+    panelFontsRequested = true;
+    if (typeof FontFace === 'undefined' || !document.fonts) return;
+    PANEL_FONTS.forEach(async (font) => {
+      try {
+        const response = await fetch(chrome.runtime.getURL(font.file));
+        const face = new FontFace(font.family, await response.arrayBuffer(), font.descriptors);
+        await face.load();
+        document.fonts.add(face);
+      } catch (err) {
+        // 拿不到就用系统衬线体，不影响翻译
+      }
+    });
+  }
+
   async function loadStyles() {
     try {
       const cssURL = chrome.runtime.getURL('styles.css');
@@ -240,6 +235,7 @@
     panelElement.style.pointerEvents = 'auto';
     shadowRoot.appendChild(panelElement);
     bindPanelEvents();
+    loadPanelFonts();
     return panelElement;
   }
 
@@ -301,15 +297,19 @@
     dragZone.appendChild(dots);
     toolbar.appendChild(dragZone);
 
+    // 左组管内容（收藏、复制），右组管窗口（固定、关闭）；重新翻译放到底部状态栏
     const actions = document.createElement('div');
     actions.classList.add('lct-toolbar-actions');
-    actions.appendChild(createIconButton('retry', ICONS.retry, '重试'));
     const favoriteBtn = createIconButton('favorite', ICONS.star, '收藏');
     favoriteBtn.style.display = 'none';
     actions.appendChild(favoriteBtn);
     const copyBtn = createIconButton('copy', ICONS.copy, '翻译完成后可复制');
     copyBtn.disabled = true;
     actions.appendChild(copyBtn);
+    const sep = document.createElement('span');
+    sep.classList.add('lct-toolbar-sep');
+    sep.setAttribute('aria-hidden', 'true');
+    actions.appendChild(sep);
     const pinBtn = createIconButton('pin', ICONS.pin, '固定');
     pinBtn.classList.toggle('lct-active', state.isPinned);
     actions.appendChild(pinBtn);
@@ -581,12 +581,22 @@
 
     section.style.display = 'flex';
     section.innerHTML = '';
+    // 每项一行：类型 ······ 形态
     value.forEach((item) => {
       if (!item || !item.form) return;
-      const pill = document.createElement('span');
-      pill.classList.add('lct-morphology-pill');
-      pill.textContent = (item.type ? item.type + ': ' : '') + item.form;
-      section.appendChild(pill);
+      const row = document.createElement('div');
+      row.classList.add('lct-morphology-pill');
+      const type = document.createElement('span');
+      type.classList.add('lct-morphology-type');
+      type.textContent = item.type || '形态';
+      const leader = document.createElement('span');
+      leader.classList.add('lct-leader');
+      const form = document.createElement('span');
+      form.textContent = item.form;
+      row.appendChild(type);
+      row.appendChild(leader);
+      row.appendChild(form);
+      section.appendChild(row);
     });
     section.classList.add('lct-fade-in');
   }
@@ -823,6 +833,46 @@
     else renderSpacedSyntax(container, inlineComponents, query);
   }
 
+  // 语法成分用同一支蓝笔的不同记号区分，图例只列句子里出现过的
+  const SYNTAX_MARK_LABELS = [
+    ['subject', '主语'],
+    ['predicate', '谓语'],
+    ['object', '宾语'],
+    ['modifier', '修饰'],
+    ['clause', '从句'],
+    ['particle', '助词']
+  ];
+
+  function syncSyntaxLegend(flowContainer) {
+    const parent = flowContainer && flowContainer.parentNode;
+    if (!parent) return;
+    let legend = parent.querySelector('.lct-syntax-legend');
+    if (!legend) {
+      legend = document.createElement('div');
+      legend.classList.add('lct-syntax-legend');
+      parent.insertBefore(legend, flowContainer.nextSibling);
+    }
+    legend.innerHTML = '';
+    const present = new Set(
+      Array.from(flowContainer.querySelectorAll('.lct-syntax-node')).map((n) => n.getAttribute('data-type'))
+    );
+    SYNTAX_MARK_LABELS.forEach(([type, text]) => {
+      if (!present.has(type)) return;
+      const key = document.createElement('span');
+      key.classList.add('lct-syntax-node', 'lct-syntax-key');
+      key.setAttribute('data-type', type);
+      key.textContent = text;
+      legend.appendChild(key);
+    });
+    if (legend.childNodes.length) {
+      const hint = document.createElement('span');
+      hint.classList.add('lct-syntax-legend-hint');
+      hint.textContent = '悬停看成分名';
+      legend.appendChild(hint);
+    }
+    legend.style.display = legend.childNodes.length ? '' : 'none';
+  }
+
   function buildSyntaxAnalysis(syntaxAnalysis, query, lang) {
     const card = document.createElement('div');
     card.classList.add('lct-syntax-card');
@@ -841,6 +891,7 @@
       flowContainer.classList.add('lct-syntax-inline-flow');
       renderInlineComponents(flowContainer, syntaxAnalysis.inlineComponents, query, lang);
       card.appendChild(flowContainer);
+      syncSyntaxLegend(flowContainer);
     }
 
     if (syntaxAnalysis.structureExplanation) {
@@ -861,10 +912,19 @@
     chrome.storage.local.get(['modelList'], (result) => {
       const models = result.modelList || [];
       const model = models.find((m) => m.id === modelId);
-      const displayName = model ? model.name : (modelId || 'Default');
-      const prefix = fromCache ? '\u26A1 缓存' : '\u23F1 ' + elapsed + 's';
-      statusBar.textContent = prefix + ' · ' + LCT.lang.label(lang) + ' · ' + displayName;
-      statusBar.style.display = 'block';
+      const displayName = model ? model.name : (modelId || '默认模型');
+      const prefix = fromCache ? '缓存' : elapsed + ' 秒';
+      statusBar.innerHTML = '';
+      const info = document.createElement('span');
+      info.classList.add('lct-status-info');
+      info.textContent = prefix + ' · ' + LCT.lang.label(lang) + ' · ' + displayName;
+      const retry = document.createElement('button');
+      retry.classList.add('lct-status-retry');
+      retry.dataset.action = 'retry';
+      retry.textContent = '重新翻译';
+      statusBar.appendChild(info);
+      statusBar.appendChild(retry);
+      statusBar.style.display = '';
       statusBar.classList.add('lct-fade-in');
     });
   }
@@ -933,6 +993,7 @@
           }
           flowContainer.style.display = '';
           renderInlineComponents(flowContainer, data.syntaxAnalysis.inlineComponents, data.query, receivedData.lang);
+          syncSyntaxLegend(flowContainer);
         }
 
         ensureFieldComplete('.lct-syntax-explanation', data.syntaxAnalysis.structureExplanation);
@@ -1191,13 +1252,21 @@
     titleRow.appendChild(label);
     card.appendChild(titleRow);
 
-    expressions.forEach((expr) => {
+    const ROMAN = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x'];
+    expressions.forEach((expr, index) => {
       const item = document.createElement('div');
       item.classList.add('lct-expression-item');
       const phrase = document.createElement('span');
       phrase.classList.add('lct-expression-phrase');
       phrase.textContent = expr.phrase;
       item.appendChild(phrase);
+      const num = document.createElement('sup');
+      num.classList.add('lct-expression-num');
+      num.textContent = ROMAN[index] || String(index + 1);
+      item.appendChild(num);
+      const leader = document.createElement('span');
+      leader.classList.add('lct-leader');
+      item.appendChild(leader);
       const meaning = document.createElement('span');
       meaning.classList.add('lct-expression-meaning');
       meaning.textContent = expr.meaning;
@@ -1356,7 +1425,11 @@
       } else if (action === 'favorite') {
         await handleFavorite(btn);
       } else if (action === 'open-settings') {
-        showToast('请点击浏览器工具栏中的扩展图标打开设置');
+        try {
+          chrome.runtime.sendMessage({ type: 'OPEN_OPTIONS', hash: 'connection' });
+        } catch (err) {
+          showToast('请点击浏览器工具栏中的扩展图标打开设置');
+        }
       }
     });
   }
@@ -1393,7 +1466,7 @@
     }, 1500);
   }
 
-  // 单词按 popup 里的勾选和顺序拼行;句子仍只复制译文
+  // 单词按设置页里的勾选和顺序拼行（可按站点覆盖）;句子仍只复制译文
   function getCopyableText(data) {
     if (typeof formatCopyableText === 'function') {
       return formatCopyableText(data, copyWordFields);

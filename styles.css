@@ -1,91 +1,49 @@
 /* ========================================================================
    styles.css — 翻译面板样式
    注入到 Shadow DOM 内部，与宿主页面完全隔离
-   设计风格：Notion / Apple / Linear 现代简约
+   设计风格：Odyssey Paper —— 纸色底、墨色字、唯一的印刷蓝；用线不用框
    ======================================================================== */
 
 /* ========== CSS 变量系统 ========== */
 :host {
-  /* 颜色（浅色默认） */
-  --lct-bg: #FFFFFF;
-  --lct-bg-secondary: #F6F7F9;
-  --lct-text-primary: #1A1A1A;
-  --lct-text-secondary: #6B7280;
-  --lct-text-tertiary: #9CA3AF;
-  --lct-border: #E5E7EB;
-  --lct-accent: #3B82F6;
-  --lct-accent-soft: rgba(59, 130, 246, 0.08);
-  --lct-highlight-pink: #E11D48;
-  --lct-icon-default: #9CA3AF;
-  --lct-icon-hover-bg: #F3F4F6;
-  --lct-pin-active: #3B82F6;
-  --lct-copied-color: #10B981;
-  --lct-chip-text: #2563EB;
-  --lct-chip-bg: #EFF6FF;
-  --lct-error-bg: #FEF2F2;
-  --lct-error-border: #FECACA;
-  --lct-error-title: #991B1B;
-  --lct-error-text: #7F1D1D;
-  --lct-error-meta: #B91C1C;
-  --lct-error-btn: #DC2626;
-  --lct-error-btn-secondary-bg: #FFFFFF;
-  --lct-error-btn-secondary-border: #FCA5A5;
+  --lct-bg: #e4e2d7;
+  --lct-ink: #141412;
+  --lct-ink-muted: #57544c;
+  --lct-accent: #2456a6;
+  --lct-tint: rgba(207, 203, 186, 0.55);
+  --lct-rule-soft: rgba(87, 84, 76, 0.45);
+  --lct-highlight: rgba(36, 86, 166, 0.16);
 
-  /* 阴影 */
-  --lct-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05),
-                0 10px 30px -5px rgba(0, 0, 0, 0.08);
+  /* 面板浮在任意网页上，用一层纸片投影把它和网页分开 */
+  --lct-shadow: 0 0 0 1px rgba(0, 0, 0, 0.04),
+                1px 2px 3px -1px rgba(27, 22, 17, 0.22),
+                6px 14px 28px -10px rgba(27, 22, 17, 0.38);
 
-  /* 间距 */
-  --lct-padding: 16px;
-  --lct-padding-sm: 12px;
-  --lct-gap: 8px;
-  --lct-gap-lg: 12px;
+  --lct-padding: 18px;
 
-  /* 字体 */
-  --lct-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI',
-                     'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
-                     sans-serif;
-  --lct-font-size-lg: 20px;
-  --lct-font-size-md: 14px;
-  --lct-font-size-sm: 13px;
-  --lct-font-size-xs: 12px;
+  /* LCT 前缀的字体由 content-panel 第一次弹面板时注册到 document.fonts（Shadow DOM 里 @font-face 不生效）；
+     中文正文用系统宋体，小型大写用 Alegreya 自带的 smcp */
+  --lct-serif-zh: 'Noto Serif SC', 'Songti SC', 'STSong', 'Noto Serif CJK SC', 'Source Han Serif SC', Georgia, serif;
+  --lct-display-zh: 'LCT ZCOOL XiaoWei', 'Songti SC', 'STSong', 'Noto Serif CJK SC', 'Source Han Serif SC', serif;
+  --lct-body: 'LCT Alegreya', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Songti SC', serif;
+  --lct-smallcaps: 'LCT Alegreya', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  --lct-display: 'LCT Alegreya', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
 
-  /* 圆角 */
-  --lct-radius: 12px;
-  --lct-radius-sm: 8px;
-  --lct-radius-xs: 6px;
-
-  /* 动画 */
-  --lct-transition: 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  --lct-transition: 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-/* 深色主题：由 content-panel 在 host 上设置 data-theme="dark" */
+/* 深色主题：由 content-panel 在 host 上设置 data-theme="dark"；不是反色，是蓝黑纸 */
 :host([data-theme="dark"]) {
-  --lct-bg: #1C1C1E;
-  --lct-bg-secondary: #2C2C2E;
-  --lct-text-primary: #F5F5F7;
-  --lct-text-secondary: #A1A1AA;
-  --lct-text-tertiary: #71717A;
-  --lct-border: #3A3A3C;
-  --lct-accent: #60A5FA;
-  --lct-accent-soft: rgba(96, 165, 250, 0.15);
-  --lct-highlight-pink: #FB7185;
-  --lct-icon-default: #8E8E93;
-  --lct-icon-hover-bg: #3A3A3C;
-  --lct-pin-active: #60A5FA;
-  --lct-copied-color: #34D399;
-  --lct-chip-text: #93C5FD;
-  --lct-chip-bg: rgba(59, 130, 246, 0.18);
-  --lct-error-bg: rgba(127, 29, 29, 0.35);
-  --lct-error-border: #7F1D1D;
-  --lct-error-title: #FCA5A5;
-  --lct-error-text: #FECACA;
-  --lct-error-meta: #F87171;
-  --lct-error-btn: #EF4444;
-  --lct-error-btn-secondary-bg: #2C2C2E;
-  --lct-error-btn-secondary-border: #7F1D1D;
-  --lct-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4),
-                0 10px 30px -5px rgba(0, 0, 0, 0.5);
+  --lct-bg: #10131a;
+  --lct-ink: #dbe4f2;
+  --lct-ink-muted: #8fa0bd;
+  --lct-accent: #7fa8f0;
+  --lct-tint: rgba(127, 168, 240, 0.12);
+  --lct-rule-soft: rgba(143, 160, 189, 0.45);
+  --lct-highlight: rgba(127, 168, 240, 0.24);
+  --lct-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2),
+                1px 2px 3px -1px rgba(0, 0, 0, 0.4),
+                6px 14px 28px -10px rgba(0, 0, 0, 0.6);
 }
 
 /* ========== 面板基础 ========== */
@@ -97,13 +55,13 @@
   overflow-y: auto;
   overflow-x: hidden;
   background: var(--lct-bg);
-  border-radius: var(--lct-radius);
+  border: 1.5px solid var(--lct-ink);
+  border-radius: 0;
   box-shadow: var(--lct-shadow);
-  border: 1px solid var(--lct-border);
-  font-family: var(--lct-font-family);
-  font-size: var(--lct-font-size-md);
-  color: var(--lct-text-primary);
-  line-height: 1.6;
+  font-family: var(--lct-serif-zh);
+  font-size: 14px;
+  color: var(--lct-ink);
+  line-height: 1.7;
   z-index: 2147483647;
   display: none;
   box-sizing: border-box;
@@ -111,43 +69,56 @@
   transform: scale(0.96) translateY(-4px);
   transition: opacity var(--lct-transition),
               transform var(--lct-transition);
+  -webkit-font-smoothing: antialiased;
 }
 
-/* 面板内所有元素继承 box-sizing */
 .lct-panel *,
 .lct-panel *::before,
 .lct-panel *::after {
   box-sizing: border-box;
 }
 
-/* 滚动条 */
+/* 滚动条：一根细墨线 */
 .lct-panel::-webkit-scrollbar {
-  width: 4px;
+  width: 6px;
 }
 .lct-panel::-webkit-scrollbar-track {
   background: transparent;
 }
 .lct-panel::-webkit-scrollbar-thumb {
-  background: var(--lct-text-tertiary);
-  border-radius: 2px;
+  background: var(--lct-rule-soft);
+  border-left: 3px solid var(--lct-bg);
 }
 .lct-panel::-webkit-scrollbar-thumb:hover {
-  background: var(--lct-text-secondary);
+  background: var(--lct-ink-muted);
+}
+
+/* 点线引导：标签 ······ 值 */
+.lct-leader {
+  flex: 1 1 auto;
+  min-width: 14px;
+  margin: 0 10px;
+  border-bottom: 1.5px dotted var(--lct-ink-muted);
+  transform: translateY(-4px);
 }
 
 /* ========== 工具栏 ========== */
 .lct-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 8px 6px 12px;
-  border-bottom: 1px solid var(--lct-border);
+  padding: 4px 6px 4px 10px;
+  background: var(--lct-bg);
+  border-bottom: 1px solid var(--lct-ink);
   user-select: none;
 }
 
 .lct-drag-zone {
   flex: 1;
-  height: 28px;
+  height: 30px;
   cursor: grab;
   display: flex;
   align-items: center;
@@ -156,29 +127,35 @@
   cursor: grabbing;
 }
 
-/* 拖拽区域的视觉提示（6 个小圆点） */
 .lct-drag-dots {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, 3px);
   gap: 3px;
-  flex-wrap: wrap;
-  width: 14px;
-  opacity: 0;
+  padding: 0 4px;
+  opacity: 0.7;
   transition: opacity var(--lct-transition);
 }
 .lct-toolbar:hover .lct-drag-dots {
-  opacity: 0.4;
+  opacity: 1;
 }
 .lct-drag-dot {
   width: 3px;
   height: 3px;
   border-radius: 50%;
-  background: var(--lct-text-tertiary);
+  background: var(--lct-ink-muted);
 }
 
 .lct-toolbar-actions {
   display: flex;
   align-items: center;
-  gap: 2px;
+}
+
+/* 内容操作和窗口操作之间的竖线 */
+.lct-toolbar-sep {
+  width: 1px;
+  height: 16px;
+  margin: 0 5px;
+  background: var(--lct-rule-soft);
 }
 
 /* ========== 图标按钮 ========== */
@@ -187,37 +164,43 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--lct-radius-xs);
-  color: var(--lct-icon-default);
+  width: 30px;
+  height: 30px;
+  color: var(--lct-ink);
   cursor: pointer;
   transition: background var(--lct-transition),
               color var(--lct-transition);
   flex-shrink: 0;
 }
 .lct-icon-btn:hover {
-  background: var(--lct-icon-hover-bg);
-  color: var(--lct-text-secondary);
+  background: var(--lct-tint);
 }
+.lct-icon-btn:focus-visible {
+  outline: 2px solid var(--lct-accent);
+  outline-offset: -2px;
+}
+/* 已固定：墨色实底 */
 .lct-icon-btn.lct-active {
-  color: var(--lct-pin-active);
-  background: var(--lct-accent-soft);
+  background: var(--lct-ink);
+  color: var(--lct-bg);
 }
+/* 已收藏：蓝色实心星 */
 .lct-icon-btn[data-action="favorite"].lct-active {
-  color: #F59E0B;
-  background: rgba(245, 158, 11, 0.1);
+  background: transparent;
+  color: var(--lct-accent);
+}
+.lct-icon-btn[data-action="favorite"].lct-active svg {
+  fill: currentColor;
 }
 .lct-icon-btn.lct-copied {
-  color: var(--lct-copied-color);
+  color: var(--lct-accent);
 }
 .lct-icon-btn:disabled {
   opacity: 0.35;
-  cursor: not-allowed;
+  cursor: default;
 }
 .lct-icon-btn:disabled:hover {
   background: transparent;
-  color: var(--lct-icon-default);
 }
 
 .lct-icon-btn svg {
@@ -227,253 +210,296 @@
 
 /* ========== 单词头部区域 ========== */
 .lct-word-header {
-  padding: var(--lct-padding-sm) var(--lct-padding) 0;
+  position: relative;
+  /* 右边给喇叭留位置，词长了也不会把它挤到下一行 */
+  padding: 16px calc(var(--lct-padding) + 40px) 0 var(--lct-padding);
   display: flex;
   align-items: baseline;
-  gap: var(--lct-gap);
+  column-gap: 10px;
+  row-gap: 2px;
   flex-wrap: wrap;
 }
 
 .lct-word {
-  font-size: var(--lct-font-size-lg);
-  font-weight: 700;
-  color: var(--lct-text-primary);
-  letter-spacing: -0.02em;
+  font-family: var(--lct-body);
+  font-size: 28px;
+  font-weight: 500;
+  line-height: 1.15;
+  color: var(--lct-ink);
+  overflow-wrap: anywhere;
 }
 
 .lct-phonetic {
-  font-size: var(--lct-font-size-sm);
-  color: var(--lct-text-tertiary);
-  font-family: 'Lucida Sans Unicode', 'Arial Unicode MS', sans-serif;
+  font-family: var(--lct-body);
+  font-size: 15px;
+  font-style: italic;
+  color: var(--lct-ink-muted);
 }
 
 /* ---- 日语专属：假名 / 罗马音 / 辞書形 ---- */
 .lct-kana {
-  font-size: var(--lct-font-size-sm);
-  color: var(--lct-text-secondary);
+  font-size: 14px;
+  color: var(--lct-ink-muted);
 }
 
 .lct-romaji {
-  font-size: var(--lct-font-size-xs);
-  color: var(--lct-text-tertiary);
+  font-family: var(--lct-body);
+  font-size: 15px;
   font-style: italic;
+  color: var(--lct-ink-muted);
 }
 
 .lct-dictionary-form {
-  font-size: var(--lct-font-size-sm);
-  color: var(--lct-chip-text);
-  background: var(--lct-chip-bg);
-  border-radius: 6px;
-  padding: 4px 10px;
-  margin: 0 16px 4px;
+  margin: 10px var(--lct-padding) 0;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: var(--lct-ink-muted);
 }
 
 .lct-progressive-morphology {
-  padding: 8px var(--lct-padding) 0;
+  padding: 10px var(--lct-padding) 0;
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  flex-direction: column;
+  gap: 2px;
 }
 
+/* 形态：类型 ······ 形式 */
 .lct-morphology-pill {
-  font-size: var(--lct-font-size-xs);
-  color: var(--lct-text-secondary);
-  background: var(--lct-bg-secondary);
-  border: 1px solid var(--lct-border);
-  border-radius: 999px;
-  padding: 2px 8px;
-  line-height: 1.5;
+  display: flex;
+  align-items: baseline;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--lct-ink);
 }
 
+.lct-morphology-type {
+  color: var(--lct-ink-muted);
+  letter-spacing: 0.12em;
+}
+
+/* 喇叭：一圈墨线的圆按钮，靠右 */
 .lct-speaker {
-  margin-left: 2px;
-  position: relative;
-  top: 2px;
-  cursor: pointer;
+  margin-left: auto;
+  align-self: center;
+  width: 30px;
+  height: 30px;
+  border: 1.5px solid var(--lct-ink);
+  border-radius: 50%;
+}
+
+.lct-speaker:hover {
+  background: var(--lct-ink);
+  color: var(--lct-bg);
+}
+
+.lct-speaker svg {
+  width: 14px;
+  height: 14px;
 }
 
 .lct-speaker-loading {
-  animation: lct-speaker-pulse 1s ease-in-out infinite;
+  animation: lct-pulse 1s ease-in-out infinite;
 }
 
-@keyframes lct-speaker-pulse {
+@keyframes lct-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }
 }
 
 .lct-speaker-ready {
   color: var(--lct-accent);
+  border-color: var(--lct-accent);
 }
 
 .lct-speaker-error {
-  color: var(--lct-text-tertiary);
-  opacity: 0.5;
+  color: var(--lct-ink-muted);
+  border-color: var(--lct-ink-muted);
+  opacity: 0.6;
+}
+
+.lct-word-header .lct-speaker {
+  position: absolute;
+  top: 16px;
+  right: var(--lct-padding);
 }
 
 .lct-sentence-section .lct-speaker {
   display: inline-flex;
-  margin-top: 4px;
+  flex: none;
+  margin-left: 0;
+}
+
+/* 斜体只给有真斜体的西文字体；中日文没有斜体就保持正体，不要被浏览器硬拉斜 */
+.lct-phonetic,
+.lct-romaji,
+.lct-example,
+.lct-expression-phrase,
+.lct-syntax-node--omitted {
+  font-synthesis: none;
 }
 
 /* ========== 释义与例句 ========== */
 .lct-definitions {
-  padding: var(--lct-gap-lg) var(--lct-padding) 0;
+  padding: 14px var(--lct-padding) 0;
 }
 
 .lct-def-item {
   display: flex;
   align-items: baseline;
-  gap: var(--lct-gap);
-  margin-bottom: 2px;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.lct-def-item:first-child {
+  margin-top: 0;
 }
 
 .lct-pos {
-  font-size: var(--lct-font-size-xs);
-  color: var(--lct-accent);
-  font-weight: 600;
-  background: var(--lct-accent-soft);
-  padding: 1px 7px;
-  border-radius: 4px;
+  flex: none;
+  min-width: 32px;
+  font-family: var(--lct-smallcaps);
+  font-variant-caps: small-caps;
+  font-size: 15px;
+  color: var(--lct-ink-muted);
   white-space: nowrap;
-  line-height: 1.8;
 }
 
 .lct-meaning {
-  font-size: var(--lct-font-size-md);
-  color: var(--lct-text-primary);
+  font-size: 15px;
+  color: var(--lct-ink);
   line-height: 1.6;
 }
 
 .lct-example {
-  font-size: var(--lct-font-size-sm);
-  color: var(--lct-text-secondary);
-  padding-left: 12px;
-  border-left: 2px solid var(--lct-border);
-  margin: 8px 0 2px;
-  line-height: 1.6;
+  margin: 6px 0 0 42px;
+  font-family: var(--lct-body);
+  font-size: 15px;
+  font-style: italic;
+  color: var(--lct-ink);
+  line-height: 1.55;
 }
 
 .lct-example-trans {
-  font-size: var(--lct-font-size-xs);
-  color: var(--lct-text-tertiary);
-  padding-left: 12px;
-  margin-bottom: 10px;
-  line-height: 1.5;
+  margin: 2px 0 0 42px;
+  font-size: 13px;
+  color: var(--lct-ink-muted);
+  line-height: 1.7;
 }
 
-/* 目标单词高亮 */
+/* 目标单词：蓝笔荧光，压在字的下半截 */
 .lct-highlight {
-  background: none;
-  color: var(--lct-highlight-pink);
-  font-weight: 500;
+  background: linear-gradient(transparent 38%, var(--lct-highlight) 38%);
+  color: inherit;
+  font-weight: inherit;
 }
 
 /* ========== 长句翻译区 ========== */
 .lct-sentence-section {
-  padding: var(--lct-padding-sm) var(--lct-padding);
+  padding: 16px var(--lct-padding) 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
 }
 
 .lct-original {
-  font-size: var(--lct-font-size-sm);
-  color: var(--lct-text-secondary);
-  margin-bottom: var(--lct-gap);
-  line-height: 1.6;
+  flex: 1;
+  font-family: var(--lct-body);
+  font-size: 16px;
+  color: var(--lct-ink-muted);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
 }
 
 .lct-translation {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--lct-text-primary);
-  line-height: 1.6;
+  font-size: 17px;
+  color: var(--lct-ink);
+  line-height: 1.8;
 }
 
-/* ========== 语境解析卡片 ========== */
-.lct-context-card {
-  margin: var(--lct-gap-lg) var(--lct-padding) var(--lct-padding);
-  padding: var(--lct-padding-sm) var(--lct-padding-sm);
-  background: var(--lct-bg-secondary);
-  border-radius: var(--lct-radius-sm);
-}
-
-.lct-context-title-row {
+/* ========== 分节：标题 + 一条细线 ========== */
+.lct-context-title-row,
+.lct-syntax-title-row,
+.lct-expressions-title-row {
   display: flex;
   align-items: center;
-  gap: var(--lct-gap);
-  margin-bottom: 8px;
+  gap: 10px;
+  margin-bottom: 10px;
 }
 
-.lct-context-label {
-  font-size: 11px;
+.lct-context-title-row::after,
+.lct-syntax-title-row::after,
+.lct-expressions-title-row::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--lct-rule-soft);
+}
+
+.lct-context-label,
+.lct-syntax-label,
+.lct-expressions-label {
+  font-size: 12px;
   font-weight: 600;
-  color: var(--lct-text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.22em;
+  color: var(--lct-ink-muted);
+  white-space: nowrap;
+}
+
+/* ========== 语境解析 ========== */
+.lct-context-card {
+  margin: 20px var(--lct-padding) 0;
 }
 
 .lct-core-translation {
-  font-size: var(--lct-font-size-md);
-  font-weight: 700;
-  color: var(--lct-text-primary);
-  margin-bottom: 6px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--lct-ink);
+  line-height: 1.5;
 }
 
 .lct-analysis-text {
-  font-size: var(--lct-font-size-sm);
-  color: var(--lct-text-secondary);
-  line-height: 1.7;
-  margin-bottom: var(--lct-gap);
+  margin-top: 6px;
+  font-size: 14px;
+  color: var(--lct-ink);
+  line-height: 1.85;
 }
 
 .lct-usage-text {
-  font-size: var(--lct-font-size-xs);
-  color: var(--lct-text-tertiary);
-  line-height: 1.6;
-  padding-top: 8px;
-  border-top: 1px solid var(--lct-border);
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--lct-ink-muted);
+  line-height: 1.8;
 }
 
-/* ========== 句法分析卡片 ========== */
+.lct-usage-text::before {
+  content: '用法';
+  margin-right: 6px;
+  color: var(--lct-ink);
+  letter-spacing: 0.16em;
+}
+
+/* ========== 语法拆解 ========== */
 .lct-progressive-syntax {
-  margin: var(--lct-gap-lg) var(--lct-padding);
-  padding: var(--lct-padding-sm);
-  background: var(--lct-bg-secondary);
-  border-radius: var(--lct-radius-sm);
+  margin: 20px var(--lct-padding) 0;
 }
 
-.lct-syntax-title-row {
-  display: flex;
-  align-items: center;
-  gap: var(--lct-gap);
-  margin-bottom: 8px;
-}
-
-.lct-syntax-label {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--lct-text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-/* ---- 行内流式容器 ---- */
 .lct-syntax-inline-flow {
   display: block;
+  font-family: var(--lct-body);
+  font-size: 16px;
   line-height: 2.2;
-  margin-bottom: 10px;
-  font-size: var(--lct-font-size-sm);
-  color: var(--lct-text-primary);
+  color: var(--lct-ink);
 }
 
-/* ---- 语法节点 ---- */
+/* ---- 语法节点：同一支蓝笔的不同记号 ---- */
 .lct-syntax-node {
   display: inline;
   position: relative;
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  transition: border-color 0.2s;
+  cursor: default;
 }
 
 .lct-syntax-node--omitted {
@@ -482,91 +508,117 @@
   margin: 0 4px;
 }
 
-/* ---- 常驻下划线（5 种类型色） ---- */
+/* 主语：蓝色下划线 */
 .lct-syntax-node[data-type="subject"] {
-  border-bottom-color: #ff4d4f;
+  text-decoration: underline;
+  text-decoration-color: var(--lct-accent);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 0.22em;
 }
+/* 谓语：加粗 */
 .lct-syntax-node[data-type="predicate"] {
-  border-bottom-color: #1890ff;
+  font-weight: 700;
 }
+/* 宾语：蓝色波浪线 */
 .lct-syntax-node[data-type="object"] {
-  border-bottom-color: #52c41a;
+  text-decoration: underline wavy;
+  text-decoration-color: var(--lct-accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.26em;
 }
+/* 修饰：荧光压在字的下半截 */
 .lct-syntax-node[data-type="modifier"] {
-  border-bottom-color: #faad14;
+  background: linear-gradient(transparent 38%, var(--lct-highlight) 38%);
 }
+/* 从句 / 引导词：一圈细墨框 */
 .lct-syntax-node[data-type="clause"] {
-  border-bottom-color: #722ed1;
+  box-shadow: inset 0 0 0 1px var(--lct-ink);
+  padding: 0 3px;
 }
+/* 助词（日语）：字下着重点 */
 .lct-syntax-node[data-type="particle"] {
-  border-bottom-color: #eb2f96;
+  -webkit-text-emphasis: dot var(--lct-accent);
+  text-emphasis: dot var(--lct-accent);
+  -webkit-text-emphasis-position: under right;
+  text-emphasis-position: under right;
 }
 
-/* ---- 纯 CSS Tooltip 气泡 ---- */
+/* ---- 悬停显示成分名：一张小纸条 ---- */
 .lct-syntax-node::before {
   content: attr(data-role);
   position: absolute;
-  bottom: calc(100% + 6px);
+  bottom: calc(100% - 2px);
   left: 50%;
   transform: translateX(-50%);
-  padding: 4px 8px;
-  background: #fff;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
+  padding: 1px 6px;
+  border: 1px solid var(--lct-ink);
+  background: var(--lct-bg);
+  color: var(--lct-ink);
+  font-family: var(--lct-serif-zh);
+  font-size: 11px;
+  font-weight: 400;
+  font-style: normal;
+  line-height: 1.5;
+  letter-spacing: 0.08em;
+  text-decoration: none;
   white-space: nowrap;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.2s;
+  transition: opacity 0.16s;
   z-index: 10;
 }
 
-/* Tooltip 三角箭头 */
-.lct-syntax-node::after {
-  content: '';
-  position: absolute;
-  bottom: calc(100% + 2px);
-  left: 50%;
-  transform: translateX(-50%);
-  border: 4px solid transparent;
-  border-top-color: #fff;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s;
-  z-index: 10;
+.lct-syntax-node:hover {
+  background-color: var(--lct-tint);
 }
 
-.lct-syntax-node:hover::before,
-.lct-syntax-node:hover::after {
+.lct-syntax-node:hover::before {
   opacity: 1;
 }
 
-/* ---- Tooltip 文字颜色匹配类型 ---- */
-.lct-syntax-node[data-type="subject"]::before { color: #ff4d4f; }
-.lct-syntax-node[data-type="predicate"]::before { color: #1890ff; }
-.lct-syntax-node[data-type="object"]::before { color: #52c41a; }
-.lct-syntax-node[data-type="modifier"]::before { color: #faad14; }
-.lct-syntax-node[data-type="clause"]::before { color: #722ed1; }
-.lct-syntax-node[data-type="particle"]::before { color: #eb2f96; }
+/* ---- 图例 ---- */
+.lct-syntax-legend {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 14px;
+  row-gap: 4px;
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--lct-ink);
+}
 
-/* ---- 结构解析文本 ---- */
+.lct-syntax-key::before {
+  display: none;
+}
+
+.lct-syntax-key:hover {
+  background-color: transparent;
+}
+
+.lct-syntax-key[data-type="modifier"]:hover {
+  background: linear-gradient(transparent 38%, var(--lct-highlight) 38%);
+}
+
+.lct-syntax-legend-hint {
+  color: var(--lct-ink-muted);
+}
+
 .lct-syntax-explanation {
-  font-size: var(--lct-font-size-sm);
-  color: var(--lct-text-secondary);
-  line-height: 1.7;
-  padding-top: 8px;
-  border-top: 1px solid var(--lct-border);
+  margin-top: 10px;
+  font-size: 14px;
+  color: var(--lct-ink);
+  line-height: 1.85;
 }
 
 /* ========== 分隔线 ========== */
 .lct-divider {
   height: 1px;
-  background: var(--lct-border);
+  background: var(--lct-rule-soft);
   margin: 0 var(--lct-padding);
 }
 
-/* ========== 缩放手柄 ========== */
+/* ========== 缩放手柄：右下角一个墨线直角 ========== */
 .lct-resize-handle {
   position: absolute;
   right: 0;
@@ -574,41 +626,25 @@
   width: 16px;
   height: 16px;
   cursor: nwse-resize;
-  opacity: 0;
+  opacity: 0.6;
   transition: opacity var(--lct-transition);
-  border-radius: 0 0 var(--lct-radius) 0;
 }
 .lct-panel:hover .lct-resize-handle {
-  opacity: 0.35;
+  opacity: 0.8;
 }
 .lct-resize-handle:hover {
-  opacity: 0.7 !important;
+  opacity: 1 !important;
 }
 
-/* 缩放手柄三条斜线 */
 .lct-resize-handle::before {
   content: '';
   position: absolute;
   right: 3px;
   bottom: 3px;
-  width: 10px;
-  height: 10px;
-  background:
-    linear-gradient(
-      135deg,
-      transparent 40%,
-      var(--lct-text-tertiary) 40%,
-      var(--lct-text-tertiary) 43%,
-      transparent 43%,
-      transparent 60%,
-      var(--lct-text-tertiary) 60%,
-      var(--lct-text-tertiary) 63%,
-      transparent 63%,
-      transparent 80%,
-      var(--lct-text-tertiary) 80%,
-      var(--lct-text-tertiary) 83%,
-      transparent 83%
-    );
+  width: 8px;
+  height: 8px;
+  border-right: 1.5px solid var(--lct-ink-muted);
+  border-bottom: 1.5px solid var(--lct-ink-muted);
 }
 
 /* ========== Loading 状态 ========== */
@@ -617,59 +653,47 @@
   align-items: center;
   justify-content: center;
   padding: 32px var(--lct-padding);
-  color: var(--lct-text-tertiary);
-  font-size: var(--lct-font-size-sm);
+  color: var(--lct-ink-muted);
+  font-size: 13px;
   gap: 8px;
 }
 
+/* 「正在解析 English」后面跟三个蓝点 */
 .lct-initial-loading {
   display: flex;
+  flex-direction: row-reverse;
+  justify-content: flex-end;
   align-items: center;
   gap: 8px;
   padding: 22px var(--lct-padding);
-  color: var(--lct-text-secondary);
-  font-size: var(--lct-font-size-sm);
+  color: var(--lct-ink-muted);
+  font-size: 13px;
+  letter-spacing: 0.08em;
 }
 
 .lct-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--lct-border);
-  border-top-color: var(--lct-accent);
-  border-radius: 50%;
-  animation: lct-spin 0.6s linear infinite;
-}
-
-@keyframes lct-spin {
-  to { transform: rotate(360deg); }
+  width: 21px;
+  height: 5px;
+  background-image: radial-gradient(circle at 2.5px 2.5px, var(--lct-accent) 2.4px, transparent 2.6px);
+  background-size: 8px 5px;
+  background-repeat: repeat-x;
+  animation: lct-pulse 1s ease-in-out infinite;
 }
 
 /* ========== 流式输出区域 ========== */
 .lct-streaming-container {
   position: relative;
-  padding: var(--lct-padding-sm) var(--lct-padding);
+  padding: 12px var(--lct-padding);
   max-height: 400px;
   overflow-y: auto;
 }
 
-.lct-streaming-container::-webkit-scrollbar {
-  width: 4px;
-}
-.lct-streaming-container::-webkit-scrollbar-track {
-  background: transparent;
-}
-.lct-streaming-container::-webkit-scrollbar-thumb {
-  background: var(--lct-text-tertiary);
-  border-radius: 2px;
-}
-
 .lct-streaming-text {
-  font-size: var(--lct-font-size-sm);
-  color: var(--lct-text-secondary);
+  font-size: 13px;
+  color: var(--lct-ink-muted);
   line-height: 1.7;
   white-space: pre-wrap;
   word-break: break-word;
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
 }
 
 .lct-cursor {
@@ -704,60 +728,47 @@
   }
 }
 
-/* 渐进式 Header 占位 */
 .lct-progressive-header {
   align-items: baseline;
-  gap: var(--lct-gap);
   flex-wrap: wrap;
 }
 
-/* 渐进式 Translation 区域 */
 .lct-progressive-translation {
-  padding: var(--lct-gap) var(--lct-padding);
+  padding: 12px var(--lct-padding) 0;
 }
 
 .lct-translation-streaming {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--lct-text-primary);
-  line-height: 1.6;
+  font-size: 17px;
+  color: var(--lct-ink);
+  line-height: 1.8;
+  letter-spacing: 0.02em;
 }
 
-/* 渐进式 Definitions 区域 */
 .lct-progressive-definitions {
-  padding: var(--lct-gap-lg) var(--lct-padding) 0;
+  padding: 14px var(--lct-padding) 0;
 }
 
-/* 渐进式 Context 区域 */
 .lct-progressive-context {
-  margin: var(--lct-gap-lg) var(--lct-padding);
-  padding: var(--lct-padding-sm);
-  background: var(--lct-bg-secondary);
-  border-radius: var(--lct-radius-sm);
+  margin: 20px var(--lct-padding) 0;
 }
 
-/* 流式加载指示器 */
 .lct-streaming-indicator {
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 20px var(--lct-padding);
-  color: var(--lct-text-tertiary);
-  font-size: var(--lct-font-size-sm);
+  color: var(--lct-ink-muted);
+  font-size: 13px;
   gap: 8px;
 }
 
-/* ========== Shimmer 骨架占位 ========== */
+/* ========== 骨架占位：点线代替灰块 ========== */
 .lct-skeleton-line {
   height: 14px;
-  background: linear-gradient(90deg,
-    var(--lct-bg-secondary) 25%,
-    var(--lct-border) 50%,
-    var(--lct-bg-secondary) 75%);
-  background-size: 200% 100%;
-  animation: lct-shimmer 1.5s ease-in-out infinite;
-  border-radius: 4px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+  border-bottom: 1.5px dotted var(--lct-ink-muted);
+  opacity: 0.55;
+  animation: lct-pulse 1.4s ease-in-out infinite;
 }
 .lct-skeleton-line:last-child {
   margin-bottom: 0;
@@ -767,139 +778,170 @@
 .lct-skeleton-long { width: 90%; }
 .lct-skeleton-thick { height: 20px; }
 
-@keyframes lct-shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-
-/* 骨架容器间距 */
 .lct-progressive-header .lct-skeleton-line {
   margin-bottom: 0;
 }
 
-/* ========== 高级表达卡片 ========== */
+/* ========== 高级表达 ========== */
 .lct-expressions-card {
-  margin: var(--lct-gap) var(--lct-padding) var(--lct-padding);
-  padding: var(--lct-padding-sm) var(--lct-padding-sm);
-  background: var(--lct-bg-secondary);
-  border-radius: var(--lct-radius-sm);
-}
-
-.lct-expressions-title-row {
-  display: flex;
-  align-items: center;
-  gap: var(--lct-gap);
-  margin-bottom: 8px;
-}
-
-.lct-expressions-label {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--lct-text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  margin: 20px var(--lct-padding) 0;
 }
 
 .lct-expression-item {
-  margin-bottom: 10px;
-  line-height: 1.5;
-}
-.lct-expression-item:last-child {
-  margin-bottom: 0;
+  display: flex;
+  align-items: baseline;
+  margin-top: 8px;
+  line-height: 1.6;
 }
 
+.lct-expression-item:first-of-type {
+  margin-top: 0;
+}
+
+/* 短语加一圈细框，右上角标罗马数字 */
 .lct-expression-phrase {
-  display: inline-block;
-  font-size: var(--lct-font-size-xs);
-  font-weight: 600;
+  flex: none;
+  max-width: 55%;
+  padding: 0 5px;
+  border: 1px solid var(--lct-ink);
+  font-family: var(--lct-body);
+  font-size: 15px;
+  font-style: italic;
+  color: var(--lct-ink);
+  overflow-wrap: anywhere;
+}
+
+.lct-expression-num {
+  margin-left: 3px;
+  font-family: var(--lct-display);
+  font-size: 12px;
   color: var(--lct-accent);
-  background: var(--lct-accent-soft);
-  padding: 2px 8px;
-  border-radius: 4px;
-  white-space: nowrap;
-  margin-right: 6px;
-  vertical-align: baseline;
 }
 
 .lct-expression-meaning {
-  display: inline;
-  font-size: var(--lct-font-size-sm);
-  color: var(--lct-text-secondary);
-  line-height: 1.5;
-}
-
-/* 渐进式 KeyExpressions 区域 */
-.lct-progressive-expressions {
-  margin: var(--lct-gap) var(--lct-padding);
-  padding: var(--lct-padding-sm);
-  background: var(--lct-bg-secondary);
-  border-radius: var(--lct-radius-sm);
-}
-
-/* ========== 底部状态栏（耗时统计） ========== */
-.lct-status-bar {
-  padding: 6px var(--lct-padding);
-  font-size: var(--lct-font-size-xs);
-  color: var(--lct-text-tertiary);
-  border-top: 1px solid var(--lct-border);
+  font-size: 14px;
+  color: var(--lct-ink);
   text-align: right;
+  line-height: 1.6;
+}
+
+.lct-progressive-expressions {
+  margin: 20px var(--lct-padding) 0;
+}
+
+/* ========== 底部状态栏：耗时 · 语言 · 模型 ｜ 重新翻译 ========== */
+.lct-status-bar {
+  margin-top: 16px;
+  /* 右侧给缩放手柄留位置，别压住「重新翻译」 */
+  padding: 8px 26px 10px var(--lct-padding);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--lct-rule-soft);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--lct-ink-muted);
   user-select: none;
+}
+
+.lct-status-retry {
+  all: unset;
+  flex: none;
+  color: var(--lct-ink);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.lct-status-retry:hover {
+  color: var(--lct-accent);
 }
 
 /* ========== Error 状态 ========== */
 .lct-error-card {
-  margin: var(--lct-padding);
-  padding: var(--lct-padding-sm);
-  background: var(--lct-error-bg);
-  border: 1px solid var(--lct-error-border);
-  border-radius: var(--lct-radius-sm);
+  padding: 20px var(--lct-padding) 22px;
 }
 
 .lct-error-title {
-  font-size: var(--lct-font-size-md);
-  font-weight: 700;
-  color: var(--lct-error-title);
-  margin-bottom: 4px;
+  font-family: var(--lct-display-zh);
+  font-size: 24px;
+  letter-spacing: 0.08em;
+  color: var(--lct-ink);
+  line-height: 1.3;
 }
 
 .lct-error-message {
-  font-size: var(--lct-font-size-sm);
-  color: var(--lct-error-text);
-  line-height: 1.6;
+  margin-top: 8px;
+  font-size: 14px;
+  color: var(--lct-ink);
+  line-height: 1.8;
 }
 
 .lct-error-meta {
-  font-size: var(--lct-font-size-xs);
-  color: var(--lct-error-meta);
-  margin-top: 8px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--lct-ink-muted);
   word-break: break-all;
 }
 
 .lct-error-actions {
   display: flex;
-  gap: 8px;
-  margin-top: 12px;
+  align-items: center;
+  gap: 20px;
+  margin-top: 18px;
 }
 
+/* 重试：印章按钮 */
 .lct-text-btn {
   all: unset;
   cursor: pointer;
-  height: 28px;
-  padding: 0 10px;
-  border-radius: var(--lct-radius-xs);
-  background: var(--lct-error-btn);
-  color: #fff;
-  font-size: var(--lct-font-size-xs);
+  margin: 0 4px 4px 0;
+  padding: 6px 18px;
+  border: 1.5px solid var(--lct-ink);
+  box-shadow: 4px 4px 0 var(--lct-ink);
+  background: var(--lct-bg);
+  color: var(--lct-ink);
+  font-family: var(--lct-serif-zh);
+  font-size: 14px;
   font-weight: 600;
+  letter-spacing: 0.16em;
+  transition: transform 0.12s, box-shadow 0.12s;
 }
 
+.lct-text-btn:hover {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 var(--lct-ink);
+}
+
+.lct-text-btn:active {
+  transform: translate(4px, 4px);
+  box-shadow: 0 0 0 var(--lct-ink);
+}
+
+/* 打开设置：文字链接 */
 .lct-text-btn-secondary {
-  background: var(--lct-error-btn-secondary-bg);
-  color: var(--lct-error-title);
-  border: 1px solid var(--lct-error-btn-secondary-border);
+  margin: 0 0 4px;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 
-/* ========== Toast 通知 ========== */
+.lct-text-btn-secondary:hover,
+.lct-text-btn-secondary:active {
+  transform: none;
+  box-shadow: none;
+  color: var(--lct-accent);
+}
+
+/* ========== Toast 通知：一张小纸条 ========== */
 .lct-toast {
   all: initial;
   display: none;
@@ -907,18 +949,19 @@
   top: 20px;
   left: 50%;
   transform: translateX(-50%) translateY(-20px);
-  background: rgba(0, 0, 0, 0.8);
-  color: #fff;
-  padding: 8px 20px;
-  border-radius: 8px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-size: 13px;
+  padding: 7px 16px;
+  border: 1.5px solid var(--lct-ink);
+  background: var(--lct-bg);
+  color: var(--lct-ink);
+  font-family: var(--lct-serif-zh);
+  font-size: 14px;
+  letter-spacing: 0.14em;
   line-height: 1.4;
   z-index: 2147483647;
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.3s ease, transform 0.3s ease;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 6px 18px -8px rgba(27, 22, 17, 0.4);
   white-space: nowrap;
 }
 
@@ -928,32 +971,8 @@
 }
 
 /* ========== 触发图标（图标触发模式） ==========
-   外层 .lct-trigger 是 32px 透明热区，内层 .lct-trigger-chip 是 22px 可见方块。
+   外层 .lct-trigger 是 32px 透明热区，内层 .lct-trigger-chip 是 24px 纸色圆圈。
    data-h / data-v 记录图标相对松手点的方位，入场从靠近光标的那个角长出来。 */
-:host {
-  --lct-trigger-bg: #FFFFFF;
-  --lct-trigger-border: rgba(59, 130, 246, 0.28);
-  --lct-trigger-from: #2563EB;
-  --lct-trigger-to: #60A5FA;
-  --lct-trigger-fired-from: #3B82F6;
-  --lct-trigger-fired-to: #2563EB;
-  --lct-trigger-shadow: 0 1px 2px rgba(15, 23, 42, 0.08),
-                        0 4px 12px -2px rgba(59, 130, 246, 0.32);
-  --lct-trigger-ring: rgba(59, 130, 246, 0.35);
-}
-
-:host([data-theme="dark"]) {
-  --lct-trigger-bg: #2C2C2E;
-  --lct-trigger-border: rgba(96, 165, 250, 0.3);
-  --lct-trigger-from: #60A5FA;
-  --lct-trigger-to: #93C5FD;
-  --lct-trigger-fired-from: #60A5FA;
-  --lct-trigger-fired-to: #3B82F6;
-  --lct-trigger-shadow: 0 1px 2px rgba(0, 0, 0, 0.5),
-                        0 4px 14px -2px rgba(96, 165, 250, 0.35);
-  --lct-trigger-ring: rgba(96, 165, 250, 0.4);
-}
-
 .lct-trigger {
   all: initial;
   position: fixed;
@@ -971,20 +990,19 @@
 .lct-trigger-chip {
   position: relative;
   box-sizing: border-box;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 7px;
-  background: var(--lct-trigger-bg);
-  border: 1px solid var(--lct-trigger-border);
-  box-shadow: var(--lct-trigger-shadow);
+  border-radius: 50%;
+  background: var(--lct-bg);
+  border: 1.5px solid var(--lct-ink);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
   transform-origin: top left;
   /* backwards：入场结束后不再占用 transform，触发/离场的缩放才能生效 */
-  animation: lct-trigger-in 180ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
-  transition: transform 140ms cubic-bezier(0.16, 1, 0.3, 1),
-              background 140ms ease, border-color 140ms ease;
+  animation: lct-trigger-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  transition: transform 120ms ease, background 140ms ease;
 }
 
 .lct-trigger[data-h="left"] .lct-trigger-chip { transform-origin: top right; }
@@ -998,36 +1016,29 @@
   overflow: visible;
 }
 
-.lct-trigger-stop-a { stop-color: var(--lct-trigger-from); }
-.lct-trigger-stop-b { stop-color: var(--lct-trigger-to); }
+/* 渐变两端同色：星就是唯一的那支蓝 */
+.lct-trigger-stop-a,
+.lct-trigger-stop-b {
+  stop-color: var(--lct-accent);
+}
 
 .lct-trigger-glyph {
-  fill: url(#lct-trigger-grad);
+  fill: var(--lct-accent);
   transition: fill 140ms ease;
 }
 
 .lct-trigger-glyph-sm {
-  opacity: 0.75;
+  opacity: 0.8;
 }
 
-/* 碰到：方块填满强调色、星变白、轻微放大，并向外扩一圈涟漪 */
+/* 碰到：像圆按钮一样填墨、微微下沉，星变纸色 */
 .lct-trigger-fired .lct-trigger-chip {
-  background: linear-gradient(135deg, var(--lct-trigger-fired-from), var(--lct-trigger-fired-to));
-  border-color: transparent;
-  transform: scale(1.12);
+  background: var(--lct-ink);
+  transform: scale(0.92);
 }
 
 .lct-trigger-fired .lct-trigger-glyph {
-  fill: #FFFFFF;
-}
-
-.lct-trigger-fired .lct-trigger-chip::after {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  border-radius: 8px;
-  box-shadow: 0 0 0 0 var(--lct-trigger-ring);
-  animation: lct-trigger-ring 320ms ease-out forwards;
+  fill: var(--lct-bg);
 }
 
 .lct-trigger-leaving .lct-trigger-chip {
@@ -1047,16 +1058,15 @@
   }
 }
 
-@keyframes lct-trigger-ring {
-  to {
-    box-shadow: 0 0 0 9px rgba(59, 130, 246, 0);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
+  .lct-panel,
   .lct-trigger-chip,
-  .lct-trigger-fired .lct-trigger-chip::after {
+  .lct-fade-in,
+  .lct-skeleton-line,
+  .lct-spinner,
+  .lct-cursor {
     animation: none;
+    transition: none;
   }
   .lct-trigger-fired .lct-trigger-chip,
   .lct-trigger-leaving .lct-trigger-chip {

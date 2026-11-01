@@ -61,8 +61,12 @@ function createHarness({ storage = {}, addDelayMs = 500, addResponse = null } = 
   };
   context.globalThis = context;
 
-  const source = fs.readFileSync(path.join(__dirname, '..', 'content-core.js'), 'utf8');
-  vm.runInNewContext(source, context, { filename: 'content-core.js' });
+  // 和 manifest 一致：config.js 先于 content-core.js 加载
+  vm.createContext(context);
+  for (const file of ['config.js', 'content-core.js']) {
+    const source = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
+    vm.runInContext(source, context, { filename: file });
+  }
 
   return {
     storage: context.LCT.storage,

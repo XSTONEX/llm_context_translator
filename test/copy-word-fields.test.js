@@ -131,9 +131,10 @@ const wordData = {
 }
 
 {
-  const popupHtml = fs.readFileSync(path.join(__dirname, '..', 'popup.html'), 'utf8');
-  assert.match(popupHtml, /id="copyFieldList"/);
-  assert.match(popupHtml, /复制内容/);
+  // 复制内容在设置页里配置（默认配置和站点配置都能改）
+  const optionsJs = fs.readFileSync(path.join(__dirname, '..', 'options.js'), 'utf8');
+  assert.match(optionsJs, /key: 'copyWordFields'/);
+  assert.match(optionsJs, /复制内容/);
 }
 
 console.log('copy-word-fields.test.js: all passed');

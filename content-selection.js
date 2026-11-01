@@ -21,7 +21,7 @@
   }
 
   function handleMouseUp(event) {
-    if (!state.enabled) return;
+    if (!state.enabled || !state.pageEnabled) return;
     if (state.isDragging || state.isResizing) return;
     if (isEventInsidePanel(event) || LCT.trigger.containsEvent(event)) return;
 
@@ -325,23 +325,28 @@
     }
   }
 
+  // 默认配置和站点配置合并后的结果；prev 为空表示初次加载
+  function applySiteSettings(settings, prev) {
+    if (!prev || prev.ttsEnabled !== settings.ttsEnabled) {
+      LCT.tts.setEnabled(settings.ttsEnabled);
+    }
+    state.triggerMode = settings.triggerMode;
+    state.pageEnabled = settings.pageEnabled;
+    if (!prev) return;
+    if (state.triggerMode !== 'icon' || !state.pageEnabled) LCT.trigger.hide({ immediate: true });
+    if (!state.pageEnabled && state.isVisible && !state.isPinned) LCT.panel.hidePanel();
+  }
+
   function init() {
-    chrome.storage.local.get(['enabled', TTS_ENABLED_KEY, TRIGGER_MODE_KEY], (result) => {
+    chrome.storage.local.get(['enabled'], (result) => {
       state.enabled = result.enabled !== undefined ? result.enabled : true;
-      LCT.tts.setEnabled(resolveTtsEnabled(result[TTS_ENABLED_KEY]));
-      state.triggerMode = normalizeTriggerMode(result[TRIGGER_MODE_KEY]);
     });
+    LCT.settings.onChange(applySiteSettings);
+    LCT.settings.load((settings) => applySiteSettings(settings, null));
 
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area === 'local' && changes.enabled) {
         handleToggle(changes.enabled.newValue);
-      }
-      if (area === 'local' && changes[TTS_ENABLED_KEY]) {
-        LCT.tts.setEnabled(resolveTtsEnabled(changes[TTS_ENABLED_KEY].newValue));
-      }
-      if (area === 'local' && changes[TRIGGER_MODE_KEY]) {
-        state.triggerMode = normalizeTriggerMode(changes[TRIGGER_MODE_KEY].newValue);
-        if (state.triggerMode !== 'icon') LCT.trigger.hide({ immediate: true });
       }
     });
 

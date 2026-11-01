@@ -56,16 +56,19 @@ function loadConfig(matchMediaImpl) {
 // --- static surface checks ---
 {
   const popupHtml = fs.readFileSync(path.join(__dirname, '..', 'popup.html'), 'utf8');
-  assert.match(popupHtml, /id="themeSelect"/);
-  assert.match(popupHtml, /value="system"/);
-  assert.match(popupHtml, /value="light"/);
-  assert.match(popupHtml, /value="dark"/);
+  assert.match(popupHtml, /id="themeSeg"/);
+  assert.match(popupHtml, /data-value="system"/);
+  assert.match(popupHtml, /data-value="light"/);
+  assert.match(popupHtml, /data-value="dark"/);
   assert.match(popupHtml, /跟随系统/);
-  assert.match(popupHtml, /data-theme="dark"/);
+
+  const paperCss = fs.readFileSync(path.join(__dirname, '..', 'paper.css'), 'utf8');
+  assert.match(paperCss, /:root\[data-theme="dark"\]/);
+  assert.match(paperCss, /--paper:\s*#10131a/i);
 
   const styles = fs.readFileSync(path.join(__dirname, '..', 'styles.css'), 'utf8');
   assert.match(styles, /:host\(\[data-theme="dark"\]\)/);
-  assert.match(styles, /--lct-bg:\s*#1C1C1E/i);
+  assert.match(styles, /--lct-bg:\s*#10131a/i);
 
   const reviewHtml = fs.readFileSync(path.join(__dirname, '..', 'review.html'), 'utf8');
   assert.match(reviewHtml, /data-theme="dark"/);

@@ -30,6 +30,7 @@
 
   root.state = {
     enabled: true,
+    pageEnabled: true,
     isPinned: false,
     isDragging: false,
     isResizing: false,
@@ -139,6 +140,81 @@
     ].join('::');
   }
 
+  // ---------- 生效设置：默认配置 + 命中当前域名的站点配置 ----------
+  function currentHostname() {
+    try {
+      return (globalThis.location && globalThis.location.hostname) || '';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function resolveForHost(raw) {
+    const source = raw || {};
+    return resolveSiteSettings(
+      readDefaultSettings(source),
+      source[SITE_PROFILES_KEY],
+      currentHostname()
+    ).settings;
+  }
+
+  const settingsState = {
+    raw: {},
+    effective: readDefaultSettings({}),
+    listeners: [],
+    storageBound: false
+  };
+
+  function recomputeSettings() {
+    const prev = settingsState.effective;
+    const next = resolveForHost(settingsState.raw);
+    settingsState.effective = next;
+    settingsState.listeners.forEach((fn) => fn(next, prev));
+  }
+
+  // 用 newValue 直接更新缓存再重算，订阅者在 onChanged 回调里同步拿到新值
+  function bindSettingsStorage() {
+    if (settingsState.storageBound) return;
+    settingsState.storageBound = true;
+    try {
+      chrome.storage.onChanged.addListener((changes, area) => {
+        if (area !== 'local') return;
+        let touched = false;
+        SITE_STORAGE_KEYS.forEach((key) => {
+          if (!changes[key]) return;
+          settingsState.raw[key] = changes[key].newValue;
+          touched = true;
+        });
+        if (touched) recomputeSettings();
+      });
+    } catch (e) {
+      // storage API 在部分测试环境可能不可用
+    }
+  }
+
+  root.settings = {
+    // 读一次 storage 并开始跟随变更；callback 在 storage 回调里执行
+    load(callback) {
+      bindSettingsStorage();
+      try {
+        chrome.storage.local.get(SITE_STORAGE_KEYS, (result) => {
+          settingsState.raw = Object.assign({}, result || {});
+          settingsState.effective = resolveForHost(settingsState.raw);
+          if (callback) callback(settingsState.effective);
+        });
+      } catch (e) {
+        if (callback) callback(settingsState.effective);
+      }
+    },
+    get() {
+      return settingsState.effective;
+    },
+    // fn(next, prev)：默认配置或站点配置任一项变化都会触发
+    onChange(fn) {
+      settingsState.listeners.push(fn);
+    }
+  };
+
   root.storage = {
     get: getStorage,
     set: setStorage,
@@ -148,12 +224,17 @@
       return result.apiBase || DEFAULT_API_BASE;
     },
 
+    // 每次划词都重新读一遍，保证刚改的设置立刻生效
+    async getSiteSettings() {
+      return resolveForHost(await getStorage(SITE_STORAGE_KEYS));
+    },
+
     async getSettings() {
-      const result = await getStorage(['selectedModel', 'sourceLangMode', 'targetLang', 'wordsOnly']);
+      const settings = await root.storage.getSiteSettings();
       return {
-        model: result.selectedModel || null,
-        sourceLangMode: result.sourceLangMode || result.targetLang || 'auto',
-        wordsOnly: Boolean(result.wordsOnly)
+        model: settings.selectedModel,
+        sourceLangMode: settings.sourceLangMode,
+        wordsOnly: settings.wordsOnly
       };
     },
 

@@ -23,6 +23,11 @@
     }
   },
 
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+
   "background": {
     "service_worker": "background.js"
   },
@@ -63,7 +68,7 @@
 
   "web_accessible_resources": [
     {
-      "resources": ["styles.css"],
+      "resources": ["styles.css", "fonts/*.woff2"],
       "matches": ["<all_urls>"]
     }
   ]

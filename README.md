@@ -5,16 +5,17 @@
 ## 功能
 
 - **划词翻译** — 选中英文单词或句子，自动调用 LLM 进行翻译
-- **碰图标翻译（默认）** — 选中后松手点旁出现小图标，鼠标顺势滑过去碰到才翻译，避免误选也发请求；popup 可切回「选中即翻译」
+- **碰图标翻译（默认）** — 选中后松手点旁出现小图标，鼠标顺势滑过去碰到才翻译，避免误选也发请求；设置页可切回「选中即翻译」
 - **单词模式** — 音标、释义、例句、上下文语境分析
 - **句子模式** — 高质量中文翻译、语法分析、关键表达提取
+- **站点配置** — 默认配置对所有网站生效；可以给特定域名单独设定发音、翻译句子、触发方式等，子域名一并适用，越具体的域名越优先
 - **流式响应** — SSE 实时输出，无需等待完整结果
 - **多模型支持** — 默认 DeepSeek V4.1 Flash（官方 API 直连），另可选硅基流动上的 DeepSeek V3.2、GLM-5 等
 
 ## 项目结构
 
 ```
-├── manifest.json / popup.* / content.js / background.js   # Chrome 扩展前端
+├── manifest.json / popup.* / options.* / content*.js / background.js   # Chrome 扩展前端
 └── service/                                                # FastAPI 后端服务
 ```
 
@@ -35,7 +36,7 @@ uv run uvicorn app:app --reload
 
 1. 打开 `chrome://extensions/`，启用开发者模式
 2. 点击「加载已解压的扩展程序」，选择项目根目录
-3. 点击扩展图标打开 popup，在「访问令牌」里填入与后端一致的 token（见下）
+3. 点击扩展图标打开弹出窗口，点齿轮进设置页，在「连接与快捷键 › 访问令牌」里填入与后端一致的 token（见下）
 
 ## 配置
 
@@ -61,7 +62,7 @@ LCT_RATE_LIMIT_WINDOW_SECONDS=60
 后端的付费接口（`/translate`、`/api/tts`、`/api/favorites`）由 `LCT_ACCESS_TOKEN` 保护。
 
 - **`LCT_ACCESS_TOKEN` 为空 = 后端不鉴权**，任何知道你域名的人都能消耗你的 API Key。公网部署务必设置。
-- 扩展侧的 token 在 **popup 的「访问令牌」** 里填写，保存到 `chrome.storage.sync`，会随 Chrome 账号自动同步到所有设备（无需在每台电脑手动配置）。它必须与后端 `.env` 中的 `LCT_ACCESS_TOKEN` **完全一致**。
+- 扩展侧的 token 在 **设置页「连接与快捷键」的「访问令牌」** 里填写，保存到 `chrome.storage.sync`，会随 Chrome 账号自动同步到所有设备（无需在每台电脑手动配置）。它必须与后端 `.env` 中的 `LCT_ACCESS_TOKEN` **完全一致**。
 - `config.js` 只保存后端地址，不含任何密钥，因此可以安全地提交进公开仓库。
 - 生成随机令牌：`python3 -c "import secrets; print(secrets.token_urlsafe(32))"`
 - 修改后端 `.env` 后需**重启后端服务**才能生效。

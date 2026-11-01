@@ -167,6 +167,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ success: true });
     return false;
   }
+
+  // 内容脚本没有 openOptionsPage，面板里的「打开设置」转到这里
+  if (message.type === 'OPEN_OPTIONS') {
+    const hash = message.hash ? '#' + message.hash : '';
+    chrome.tabs.create({ url: chrome.runtime.getURL('options.html' + hash) });
+    sendResponse({ success: true });
+    return false;
+  }
 });
 
 async function applyEnabled(enabled) {

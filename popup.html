@@ -3,628 +3,125 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>划词翻译设置</title>
+  <title>划词翻译</title>
+  <script src="theme-boot.js"></script>
+  <link rel="stylesheet" href="paper.css">
   <style>
-    :root {
-      --bg: #ffffff;
-      --text: #1a1a1a;
-      --text-secondary: #6b7280;
-      --text-faint: #9ca3af;
-      --text-input: #374151;
-      --border: #e5e7eb;
-      --surface: #f6f7f9;
-      --surface-btn: #ffffff;
-      --accent: #007AFF;
-      --accent-soft: rgba(0, 122, 255, 0.15);
-      --toggle-off: #e5e7eb;
-      --toggle-knob: #ffffff;
-      --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-      color-scheme: light;
-    }
-
-    :root[data-theme="dark"] {
-      --bg: #1c1c1e;
-      --text: #f5f5f7;
-      --text-secondary: #a1a1aa;
-      --text-faint: #71717a;
-      --text-input: #e5e5ea;
-      --border: #3a3a3c;
-      --surface: #2c2c2e;
-      --surface-btn: #3a3a3c;
-      --accent: #0a84ff;
-      --accent-soft: rgba(10, 132, 255, 0.25);
-      --toggle-off: #3a3a3c;
-      --toggle-knob: #f5f5f7;
-      --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a1a1aa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-      color-scheme: dark;
-    }
-
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
     body {
-      width: 300px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI',
-                   'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
-                   sans-serif;
-      font-size: 14px;
-      color: var(--text);
-      background: var(--bg);
+      width: 340px;
     }
 
-    .popup-container {
-      padding: 16px;
+    .popup {
+      padding: 18px 20px 20px;
+      display: flex;
+      flex-direction: column;
     }
 
-    /* Header */
     .popup-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 12px;
     }
 
     .popup-title {
-      font-size: 16px;
-      font-weight: 700;
-      color: var(--text);
-      letter-spacing: -0.01em;
+      font-family: var(--display-zh);
+      font-size: 28px;
+      line-height: 1.05;
+      letter-spacing: 0.06em;
     }
 
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--text-faint);
-      flex-shrink: 0;
-    }
-
-    .status-dot.status-online {
-      background: #34c759;
-      animation: breathe-green 2s ease-in-out infinite;
-    }
-
-    .status-dot.status-offline {
-      background: #ff3b30;
-      animation: breathe-red 2s ease-in-out infinite;
-    }
-
-    .status-dot.status-checking {
-      background: var(--text-faint);
-      animation: breathe-gray 1s ease-in-out infinite;
-    }
-
-    @keyframes breathe-green {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.4); }
-      50%      { box-shadow: 0 0 0 4px rgba(52, 199, 89, 0); }
-    }
-
-    @keyframes breathe-red {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.4); }
-      50%      { box-shadow: 0 0 0 4px rgba(255, 59, 48, 0); }
-    }
-
-    @keyframes breathe-gray {
-      0%, 100% { opacity: 1; }
-      50%      { opacity: 0.3; }
-    }
-
-    /* Divider */
-    .popup-divider {
-      height: 1px;
-      background: var(--border);
-      margin-bottom: 14px;
-    }
-
-    /* Controls */
-    .popup-controls {
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-    }
-
-    .control-row {
+    .popup-status {
+      margin-top: 4px;
       display: flex;
       align-items: center;
-      justify-content: space-between;
-    }
-
-    .control-label {
-      font-size: 14px;
-      color: var(--text);
-      font-weight: 500;
-    }
-
-    /* iOS Toggle */
-    .toggle-switch {
-      position: relative;
-      display: inline-block;
-      width: 44px;
-      height: 24px;
-      flex-shrink: 0;
-    }
-
-    .toggle-switch input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-
-    .toggle-slider {
-      position: absolute;
-      inset: 0;
-      background: var(--toggle-off);
-      border-radius: 24px;
-      cursor: pointer;
-      transition: background 0.3s ease;
-    }
-
-    .toggle-slider::before {
-      content: '';
-      position: absolute;
-      left: 2px;
-      top: 2px;
-      width: 20px;
-      height: 20px;
-      background: var(--toggle-knob);
-      border-radius: 50%;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
-      transition: transform 0.3s ease;
-    }
-
-    .toggle-switch input:checked + .toggle-slider {
-      background: var(--accent);
-    }
-
-    .toggle-switch input:checked + .toggle-slider::before {
-      transform: translateX(20px);
-    }
-
-    /* 初始化时禁用过渡动画，防止每次打开 popup 时开关闪动 */
-    .toggle-switch.no-transition .toggle-slider,
-    .toggle-switch.no-transition .toggle-slider::before {
-      transition: none !important;
-    }
-
-    /* API Input */
-    .api-input {
-      width: 170px;
-      height: 28px;
-      padding: 0 8px;
-      font-size: 12px;
-      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
-      color: var(--text-input);
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      outline: none;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .api-input:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 2px var(--accent-soft);
-    }
-
-    .api-input::placeholder {
-      color: var(--text-faint);
-    }
-
-    /* Model Select */
-    .model-select {
-      width: 170px;
-      height: 28px;
-      padding: 0 24px 0 8px;
-      font-size: 12px;
-      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-      color: var(--text-input);
-      background-color: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      outline: none;
-      cursor: pointer;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
-      appearance: none;
-      -webkit-appearance: none;
-      background-image: var(--select-chevron);
-      background-repeat: no-repeat;
-      background-position: right 8px center;
-      background-size: 12px;
-    }
-
-    .model-select:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 2px var(--accent-soft);
-    }
-
-    .model-select:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .model-select optgroup {
-      font-weight: 600;
-      color: var(--text-secondary);
-      font-size: 11px;
-    }
-
-    .model-select option {
-      font-weight: 400;
-      color: var(--text-input);
-      padding: 4px 8px;
-    }
-
-    /* Model Info */
-    .model-row {
-      justify-content: flex-start;
-    }
-
-    .model-info {
-      font-size: 12px;
-      color: var(--text-faint);
-      font-weight: 400;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      max-width: 100%;
-    }
-
-    .popup-section {
-      margin-top: 14px;
-      padding-top: 12px;
-      border-top: 1px solid var(--border);
-    }
-
-    .section-title {
-      font-size: 12px;
-      font-weight: 700;
-      color: var(--text-secondary);
-      margin-bottom: 8px;
-    }
-
-    .section-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 8px;
-    }
-
-    .section-header .section-title {
-      margin-bottom: 0;
-    }
-
-    .section-actions {
-      display: flex;
-      gap: 4px;
-    }
-
-    .lookup-list {
-      display: flex;
-      flex-direction: column;
       gap: 6px;
-      max-height: 120px;
-      overflow-y: auto;
-    }
-
-    .lookup-item {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 4px 8px;
-      align-items: center;
-      padding: 7px 8px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-    }
-
-    .lookup-main {
-      min-width: 0;
-    }
-
-    .lookup-query {
       font-size: 12px;
+      letter-spacing: 0.08em;
+      color: var(--ink-muted);
+    }
+
+    .popup-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .popup .double-rule {
+      margin-top: 14px;
+    }
+
+    .popup-row {
+      display: flex;
+      align-items: center;
+      padding: 14px 0 12px;
+    }
+
+    .popup-row + .popup-row {
+      padding-top: 12px;
+      border-top: 1px solid var(--rule-soft);
+    }
+
+    .popup-label {
+      font-size: 16px;
       font-weight: 600;
-      color: var(--text);
-      overflow: hidden;
-      text-overflow: ellipsis;
+      letter-spacing: 0.16em;
       white-space: nowrap;
     }
 
-    .lookup-sub {
-      font-size: 11px;
-      color: var(--text-faint);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+    .popup-hint {
       margin-top: 2px;
-    }
-
-    .lookup-actions {
-      display: flex;
-      gap: 4px;
-    }
-
-    .mini-btn {
-      border: 0;
-      background: var(--surface-btn);
-      color: var(--text-secondary);
-      border-radius: 5px;
-      font-size: 11px;
-      height: 24px;
-      padding: 0 7px;
-      cursor: pointer;
-    }
-
-    .mini-btn:hover {
-      color: var(--accent);
-    }
-
-    .shortcut-row {
-      align-items: center;
-    }
-
-    .shortcut-actions {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      min-width: 0;
-    }
-
-    .shortcut-key {
-      max-width: 106px;
-      height: 24px;
-      padding: 0 7px;
-      display: inline-flex;
-      align-items: center;
-      border: 1px solid var(--border);
-      border-radius: 5px;
-      background: var(--surface);
-      color: var(--text-input);
-      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
-      font-size: 11px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .empty-state {
-      color: var(--text-faint);
       font-size: 12px;
-      padding: 8px 0;
+      letter-spacing: 0.04em;
+      color: var(--ink-muted);
     }
 
-    .section-hint {
-      font-size: 11px;
-      color: var(--text-faint);
-      margin: -2px 0 8px;
+    .popup .leader {
+      margin: 0 10px;
     }
 
-    .copy-field-list {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    .copy-field-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      height: 32px;
-      padding: 0 8px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      cursor: grab;
-      user-select: none;
-    }
-
-    .copy-field-row.is-dragging {
-      opacity: 0.4;
-    }
-
-    .copy-field-row.is-drag-over {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 2px var(--accent-soft);
-    }
-
-    .copy-field-handle {
-      display: grid;
-      grid-template-columns: 3px 3px;
-      gap: 2px;
-      width: 8px;
-      flex-shrink: 0;
-    }
-
-    .copy-field-handle i {
-      width: 3px;
-      height: 3px;
-      border-radius: 50%;
-      background: var(--text-faint);
-    }
-
-    .copy-field-label {
-      flex: 1;
-      min-width: 0;
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--text);
-    }
-
-    .copy-field-check {
-      appearance: none;
-      -webkit-appearance: none;
-      width: 16px;
-      height: 16px;
-      margin: 0;
-      border: 1.5px solid var(--border);
-      border-radius: 4px;
-      background: var(--surface-btn);
-      cursor: pointer;
-      flex-shrink: 0;
-    }
-
-    .copy-field-check:checked {
-      background-color: var(--accent);
-      border-color: var(--accent);
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
-      background-repeat: no-repeat;
-      background-position: center;
-      background-size: 10px;
+    .popup .seg button {
+      padding: 4px 10px;
     }
   </style>
-  <script>
-    // 尽早应用主题，减少 popup 打开时的闪白/闪黑
-    (function () {
-      try {
-        chrome.storage.local.get(['themeMode'], function (r) {
-          var mode = r.themeMode;
-          if (mode !== 'light' && mode !== 'dark' && mode !== 'system') mode = 'system';
-          var effective = mode;
-          if (mode === 'system') {
-            effective = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-          }
-          document.documentElement.dataset.theme = effective;
-        });
-      } catch (e) {}
-    })();
-  </script>
 </head>
 <body>
-  <div class="popup-container">
-    <div class="popup-header">
-      <span class="popup-title">划词翻译</span>
-      <span class="status-dot" id="statusDot"></span>
-    </div>
-
-    <div class="popup-divider"></div>
-
-    <div class="popup-controls">
-      <div class="control-row">
-        <span class="control-label">划词翻译</span>
-        <label class="toggle-switch">
-          <input type="checkbox" id="enableToggle">
-          <span class="toggle-slider"></span>
-        </label>
+  <div class="popup">
+    <header class="popup-header">
+      <div>
+        <div class="popup-title">划词翻译</div>
+        <div class="popup-status"><span class="status-dot" id="statusDot"></span><span id="statusText">检查中</span></div>
       </div>
-
-      <div class="control-row">
-        <span class="control-label">触发方式</span>
-        <select id="triggerModeSelect" class="model-select">
-          <option value="icon">碰图标翻译</option>
-          <option value="instant">选中即翻译</option>
-        </select>
+      <div class="popup-actions">
+        <button type="button" class="ring" id="reviewButton" aria-label="复习生词" title="复习生词">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"></path><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"></path></svg>
+        </button>
+        <button type="button" class="ring" id="settingsButton" aria-label="打开设置" title="设置">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        </button>
       </div>
+    </header>
 
-      <div class="control-row">
-        <span class="control-label">仅单词/词组</span>
-        <label class="toggle-switch">
-          <input type="checkbox" id="wordsOnlyToggle">
-          <span class="toggle-slider"></span>
-        </label>
+    <div class="double-rule"></div>
+
+    <div class="popup-row">
+      <div>
+        <div class="popup-label">总开关</div>
+        <div class="popup-hint"><span id="shortcutKey">⌘⇧L</span> 随时暂停所有网站</div>
       </div>
-
-      <div class="control-row">
-        <span class="control-label">源语言</span>
-        <select id="langSelect" class="model-select">
-          <option value="auto">自动识别</option>
-          <option value="en">English</option>
-          <option value="ja">日本語</option>
-        </select>
-      </div>
-
-      <div class="control-row">
-        <span class="control-label">发音</span>
-        <label class="toggle-switch">
-          <input type="checkbox" id="ttsEnabledToggle">
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
-
-      <div class="control-row">
-        <span class="control-label">自动发音</span>
-        <select id="ttsPlayModeSelect" class="model-select">
-          <option value="off">永久不播放</option>
-          <option value="once">播放一遍</option>
-          <option value="thrice">播放三遍</option>
-        </select>
-      </div>
-
-      <div class="control-row">
-        <span class="control-label">外观</span>
-        <select id="themeSelect" class="model-select">
-          <option value="system">跟随系统</option>
-          <option value="light">浅色</option>
-          <option value="dark">深色</option>
-        </select>
-      </div>
-
-      <div class="copy-block">
-        <div class="section-title">复制内容</div>
-        <div class="section-hint">拖动调整顺序，勾选要复制的项</div>
-        <div class="copy-field-list" id="copyFieldList"></div>
-      </div>
-
-      <div class="control-row">
-        <span class="control-label">后端地址</span>
-        <input
-          type="text"
-          id="apiBaseInput"
-          class="api-input"
-          placeholder="http://localhost:8000"
-          spellcheck="false"
-          autocomplete="off"
-        >
-      </div>
-
-      <div class="control-row">
-        <span class="control-label">访问令牌</span>
-        <input
-          type="password"
-          id="tokenInput"
-          class="api-input"
-          placeholder="与后端一致的 token"
-          spellcheck="false"
-          autocomplete="off"
-        >
-      </div>
-
-      <div class="control-row">
-        <span class="control-label">翻译模型</span>
-        <select id="modelSelect" class="model-select">
-          <option value="">加载中...</option>
-        </select>
-      </div>
-
-      <div class="control-row model-row">
-        <span class="model-info" id="modelInfo">当前模型: --</span>
-      </div>
-
-      <div class="control-row shortcut-row">
-        <span class="control-label">快捷键</span>
-        <div class="shortcut-actions">
-          <span class="shortcut-key" id="shortcutKey">加载中</span>
-          <button type="button" class="mini-btn" id="shortcutCustomizeButton">自定义</button>
-        </div>
+      <span class="leader"></span>
+      <div class="seg" role="group" aria-label="总开关" id="enableSeg">
+        <button type="button" data-value="on">开</button>
+        <button type="button" data-value="off">关</button>
       </div>
     </div>
 
-    <div class="popup-section">
-      <div class="section-header">
-        <div class="section-title">收藏词条</div>
-        <div class="section-actions">
-          <button type="button" class="mini-btn" id="reviewButton">复习</button>
-          <button type="button" class="mini-btn" id="exportButton">导出</button>
-        </div>
+    <div class="popup-row">
+      <div class="popup-label">外观</div>
+      <span class="leader"></span>
+      <div class="seg" role="group" aria-label="外观" id="themeSeg">
+        <button type="button" data-value="system">跟随系统</button>
+        <button type="button" data-value="light">浅色</button>
+        <button type="button" data-value="dark">深色</button>
       </div>
-      <div class="lookup-list" id="favoritesList"></div>
-    </div>
-
-    <div class="popup-section">
-      <div class="section-title">最近查询</div>
-      <div class="lookup-list" id="historyList"></div>
     </div>
   </div>
 

@@ -163,6 +163,15 @@ function loadPanelModule() {
       close: '<svg></svg>',
       check: '<svg></svg>'
     },
+    settings: {
+      load(callback) {
+        if (callback) callback({ themeMode: 'system', copyWordFields: null });
+      },
+      get() {
+        return { themeMode: 'system', copyWordFields: null };
+      },
+      onChange() {}
+    },
     lang: {
       label: (lang) => lang
     },

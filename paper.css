@@ -1,0 +1,353 @@
+/* ==========================================================================
+   paper.css — Odyssey Paper 样式，popup 与设置页共用
+   纸色底、墨色字、唯一的印刷蓝；用线不用框，直角，不加阴影（印章按钮除外）
+   ========================================================================== */
+
+/* 打包进扩展的字体（见 fonts/README.md）。家族名带 LCT 前缀，避免和系统里装的同名字体混用 */
+@font-face {
+  font-family: 'LCT Alegreya';
+  src: url('fonts/Alegreya-wght.woff2') format('woff2');
+  font-weight: 400 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'LCT Alegreya';
+  src: url('fonts/Alegreya-Italic-wght.woff2') format('woff2');
+  font-weight: 400 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* 只含界面标题用到的几十个字，其他字落到系统宋体 */
+@font-face {
+  font-family: 'LCT ZCOOL XiaoWei';
+  src: url('fonts/ZCOOLXiaoWei-subset.woff2') format('woff2');
+  font-display: swap;
+}
+
+:root {
+  --paper: #e4e2d7;
+  --ink: #141412;
+  --ink-muted: #57544c;
+  --accent: #2456a6;
+  --tint: rgba(207, 203, 186, 0.55);
+  --rule-soft: rgba(87, 84, 76, 0.45);
+  --highlight: rgba(36, 86, 166, 0.16);
+  /* 中文正文太大不打包，用系统宋体；小型大写用 Alegreya 自带的 smcp，配合 font-variant-caps */
+  --display-zh: 'LCT ZCOOL XiaoWei', 'Songti SC', 'STSong', 'Noto Serif CJK SC', 'Source Han Serif SC', serif;
+  --serif-zh: 'Noto Serif SC', 'Songti SC', 'STSong', 'Noto Serif CJK SC', 'Source Han Serif SC', Georgia, serif;
+  --body: 'LCT Alegreya', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Songti SC', serif;
+  --smallcaps: 'LCT Alegreya', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  --display: 'LCT Alegreya', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  color-scheme: light;
+}
+
+/* 夜间不是反色：蓝黑纸、淡蓝白字、浅蓝强调 */
+:root[data-theme="dark"] {
+  --paper: #10131a;
+  --ink: #dbe4f2;
+  --ink-muted: #8fa0bd;
+  --accent: #7fa8f0;
+  --tint: rgba(127, 168, 240, 0.12);
+  --rule-soft: rgba(143, 160, 189, 0.45);
+  --highlight: rgba(127, 168, 240, 0.24);
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--serif-zh);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--ink);
+}
+
+a:hover {
+  color: var(--accent);
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* ---------- 线 ---------- */
+
+.leader {
+  flex: 1 1 auto;
+  align-self: center;
+  min-width: 16px;
+  margin: 0 12px;
+  border-bottom: 1.5px dotted var(--ink-muted);
+}
+
+.double-rule {
+  border-top: 2px solid var(--ink);
+  padding-top: 2px;
+}
+
+.double-rule::after {
+  content: '';
+  display: block;
+  border-top: 1px solid var(--ink);
+}
+
+.ornament {
+  display: block;
+  color: var(--ink);
+}
+
+/* ---------- 分段按钮：开关和单选都用它 ---------- */
+
+.seg {
+  display: inline-flex;
+  flex: none;
+  flex-wrap: wrap;
+  border: 1.5px solid var(--ink);
+}
+
+.seg button {
+  appearance: none;
+  margin: 0;
+  border: 0;
+  padding: 5px 12px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.seg button + button {
+  border-left: 1px solid var(--ink);
+}
+
+.seg button:hover {
+  background: var(--tint);
+}
+
+.seg button.is-on {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* 站点单独改过的值用唯一的蓝 */
+.seg button.is-over {
+  background: var(--accent);
+  color: var(--paper);
+}
+
+/* 跟随默认时，实际得到的是哪个值 */
+.seg button.is-ghost {
+  outline: 1px dashed var(--ink-muted);
+  outline-offset: -5px;
+}
+
+.seg button.is-muted {
+  color: var(--ink-muted);
+}
+
+/* ---------- 圆按钮 / 印章按钮 / 文字按钮 ---------- */
+
+.ring {
+  appearance: none;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  margin: 0;
+  padding: 0;
+  border: 1.5px solid var(--ink);
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.16s, color 0.16s, transform 0.12s;
+}
+
+.ring:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.ring:active {
+  transform: scale(0.92);
+}
+
+.stamp {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 4px 4px 0;
+  padding: 7px 16px;
+  border: 1.5px solid var(--ink);
+  box-shadow: 4px 4px 0 var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+
+.stamp:hover {
+  color: var(--ink);
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.stamp:active {
+  transform: translate(4px, 4px);
+  box-shadow: 0 0 0 var(--ink);
+}
+
+.text-btn {
+  appearance: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  letter-spacing: 0.1em;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+
+.text-btn.is-muted {
+  color: var(--ink-muted);
+}
+
+.text-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.wavy {
+  text-decoration: underline wavy;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+}
+
+/* ---------- 输入 ---------- */
+
+.field {
+  appearance: none;
+  border: 0;
+  border-bottom: 1.5px solid var(--ink);
+  border-radius: 0;
+  background: transparent;
+  padding: 4px 0 6px;
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 17px;
+  outline: none;
+}
+
+.field:focus {
+  border-bottom-color: var(--accent);
+}
+
+.field::placeholder {
+  color: var(--ink-muted);
+}
+
+.select-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  max-width: 100%;
+  padding: 2px 0 4px;
+  border-bottom: 1.5px solid var(--ink);
+}
+
+.select-wrap select {
+  appearance: none;
+  max-width: 260px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.select-wrap select:disabled {
+  color: var(--ink-muted);
+  cursor: default;
+}
+
+/* ---------- 连接状态 ---------- */
+
+.status-dot {
+  display: inline-block;
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink-muted);
+}
+
+.status-dot.is-online {
+  background: var(--accent);
+}
+
+/* 不用红色：断开是一个空心圈 */
+.status-dot.is-offline {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--ink-muted);
+}
+
+.status-dot.is-checking {
+  animation: paper-pulse 1s ease-in-out infinite;
+}
+
+@keyframes paper-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

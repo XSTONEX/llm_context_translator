@@ -203,8 +203,8 @@
   // 不再等整段翻译流式输出结束
   async function autoPlay() {
     if (!state.ttsEnabled) return;
-    const result = await LCT.storage.get(['ttsPlayMode']);
-    const mode = result.ttsPlayMode || 'off';
+    const settings = await LCT.storage.getSiteSettings();
+    const mode = settings.ttsPlayMode;
     const times = mode === 'thrice' ? 3 : mode === 'once' ? 1 : 0;
     if (times === 0) return;
     whenReady(() => playTimes(times));

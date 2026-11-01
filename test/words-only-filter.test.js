@@ -45,8 +45,10 @@ deny('これはペンです。', 'ja');
 deny('今日はとてもいい天気ですね', 'ja');
 deny('短い。', 'ja');
 
-const popupHtml = fs.readFileSync(path.join(__dirname, '..', 'popup.html'), 'utf8');
-assert.match(popupHtml, /id="wordsOnlyToggle"/);
-assert.match(popupHtml, /仅单词\/词组/);
+// 设置页里叫「翻译句子」，开 = wordsOnly 为 false
+const optionsJs = fs.readFileSync(path.join(__dirname, '..', 'options.js'), 'utf8');
+assert.match(optionsJs, /key: 'wordsOnly'/);
+assert.match(optionsJs, /label: '翻译句子'/);
+assert.match(optionsJs, /options: \[\[false, '开'\], \[true, '关'\]\]/);
 
 console.log('words-only-filter.test.js: all passed');

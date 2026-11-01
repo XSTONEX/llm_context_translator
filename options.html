@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>划词翻译 · 设置</title>
+  <script src="theme-boot.js"></script>
+  <link rel="stylesheet" href="paper.css">
+  <style>
+    body {
+      min-height: 100vh;
+    }
+
+    .shell {
+      min-height: 100vh;
+      display: flex;
+      flex-wrap: wrap;
+    }
+
+    /* ---------- 目录 ---------- */
+
+    .toc {
+      flex: 1 1 260px;
+      padding: 52px 32px 32px;
+      border-right: 1px solid var(--ink);
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    .brand {
+      font-family: var(--display-zh);
+      font-size: 40px;
+      line-height: 1.05;
+      letter-spacing: 0.06em;
+    }
+
+    .brand-sub {
+      margin-top: 6px;
+      font-family: var(--smallcaps);
+      font-variant-caps: small-caps;
+      font-size: 15px;
+      letter-spacing: 0.06em;
+      color: var(--ink-muted);
+    }
+
+    .contents {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .contents a {
+      display: flex;
+      align-items: center;
+      padding: 10px 0;
+      font-size: 17px;
+      letter-spacing: 0.16em;
+      text-decoration: none;
+    }
+
+    .contents a[aria-current="page"] {
+      font-weight: 600;
+    }
+
+    .contents .leader {
+      margin: 0 10px;
+    }
+
+    .contents .count {
+      margin-left: 8px;
+      font-family: var(--body);
+      font-weight: 400;
+      font-size: 14px;
+      letter-spacing: 0;
+      color: var(--ink-muted);
+    }
+
+    .contents .num {
+      width: 32px;
+      height: 32px;
+      flex: none;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--display-zh);
+      font-weight: 400;
+      font-size: 16px;
+      letter-spacing: 0;
+    }
+
+    .contents a[aria-current="page"] .num {
+      border: 1.5px solid var(--ink);
+    }
+
+    .colophon {
+      margin-top: auto;
+      font-size: 12px;
+      letter-spacing: 0.1em;
+      color: var(--ink-muted);
+    }
+
+    /* ---------- 页面 ---------- */
+
+    main {
+      flex: 999 1 560px;
+      min-width: 0;
+      padding: 56px 64px 96px;
+    }
+
+    .page {
+      max-width: 720px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .page-wide {
+      max-width: 980px;
+    }
+
+    .page-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    .chapter {
+      font-family: var(--display-zh);
+      font-size: 24px;
+    }
+
+    h1 {
+      margin: 6px 0 0;
+      font-family: var(--display-zh);
+      font-weight: 400;
+      font-size: 60px;
+      line-height: 1.1;
+      letter-spacing: 0.08em;
+    }
+
+    .page .ornament {
+      margin-top: 14px;
+    }
+
+    .lead {
+      margin: 18px 0 0;
+      max-width: 720px;
+      font-size: 17px;
+      line-height: 1.9;
+    }
+
+    .sec {
+      margin: 48px 0 0;
+      display: flex;
+      align-items: baseline;
+      gap: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--ink);
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: 0.2em;
+    }
+
+    .sec .num {
+      font-family: var(--display-zh);
+      font-weight: 400;
+    }
+
+    .sec .count {
+      font-family: var(--body);
+      font-size: 15px;
+      font-weight: 400;
+      letter-spacing: 0;
+      color: var(--ink-muted);
+    }
+
+    /* ---------- 设置行 ---------- */
+
+    .row {
+      display: flex;
+      align-items: center;
+      padding-top: 16px;
+    }
+
+    .row.is-top {
+      align-items: flex-start;
+    }
+
+    .row.is-top .leader {
+      align-self: auto;
+      margin-top: 18px;
+    }
+
+    .row-label {
+      font-size: 16px;
+      letter-spacing: 0.14em;
+      white-space: nowrap;
+    }
+
+    .row-label-block {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 96px;
+    }
+
+    .row-label-block .row-label.is-over {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .row-cap {
+      font-size: 12px;
+      color: var(--ink-muted);
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+
+    .row-hint {
+      margin: 6px 0 0;
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--ink-muted);
+    }
+
+    .row-group.is-dim {
+      opacity: 0.4;
+    }
+
+    /* ---------- 复制内容列表 ---------- */
+
+    .copy-list {
+      width: 260px;
+      flex: none;
+      display: flex;
+      flex-direction: column;
+      border-top: 1px solid var(--ink);
+      border-bottom: 1px solid var(--ink);
+    }
+
+    .copy-list.is-accent {
+      border-color: var(--accent);
+    }
+
+    .copy-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 9px 4px;
+      cursor: grab;
+      user-select: none;
+    }
+
+    .copy-row + .copy-row {
+      border-top: 1px solid var(--rule-soft);
+    }
+
+    .copy-row.is-dragging {
+      opacity: 0.4;
+    }
+
+    .copy-row.is-drag-over {
+      background: var(--tint);
+    }
+
+    .copy-grip {
+      display: grid;
+      grid-template-columns: 3px 3px;
+      gap: 3px;
+    }
+
+    .copy-grip i {
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: var(--ink-muted);
+    }
+
+    .copy-label {
+      flex: 1;
+      font-size: 15px;
+      letter-spacing: 0.12em;
+    }
+
+    .copy-check {
+      appearance: none;
+      position: relative;
+      width: 16px;
+      height: 16px;
+      margin: 0;
+      border: 1.5px solid var(--ink);
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .copy-check:checked {
+      background: var(--ink);
+    }
+
+    .copy-list.is-accent .copy-check:checked {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .copy-check:checked::after {
+      content: '';
+      position: absolute;
+      left: 4px;
+      top: 0;
+      width: 4px;
+      height: 8px;
+      border: solid var(--paper);
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg);
+    }
+
+    /* ---------- 站点配置 ---------- */
+
+    .add-pop {
+      position: absolute;
+      top: 60px;
+      right: 0;
+      z-index: 2;
+      width: 380px;
+      max-width: 100%;
+      padding: 20px 22px 22px;
+      background: var(--paper);
+      border: 1.5px solid var(--ink);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .add-pop label {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .add-pop .field {
+      font-size: 19px;
+    }
+
+    .small-label {
+      font-size: 13px;
+      letter-spacing: 0.12em;
+      color: var(--ink-muted);
+    }
+
+    .add-pop-actions {
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 20px;
+    }
+
+    .add-error {
+      margin: 0;
+      font-size: 13px;
+      color: var(--accent);
+    }
+
+    .sites {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 48px;
+      align-items: flex-start;
+    }
+
+    .site-list {
+      flex: 1 1 260px;
+      display: flex;
+      flex-direction: column;
+      border-bottom: 1px solid var(--rule-soft);
+    }
+
+    .site-item {
+      appearance: none;
+      position: relative;
+      width: 100%;
+      margin: 0;
+      padding: 12px 36px 12px 12px;
+      border: 0;
+      border-top: 1px solid var(--rule-soft);
+      background: transparent;
+      color: var(--ink);
+      text-align: left;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      cursor: pointer;
+    }
+
+    .site-item:first-child {
+      border-top: 0;
+    }
+
+    .site-item:hover {
+      background: var(--tint);
+    }
+
+    .site-item.is-child {
+      padding-left: 30px;
+    }
+
+    .site-item[aria-current="true"] {
+      background: var(--tint);
+    }
+
+    /* 选中的站点挂一条书签丝带 */
+    .site-item[aria-current="true"]::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 12px;
+      width: 10px;
+      height: 22px;
+      background: var(--accent);
+      clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 72%, 0 100%);
+    }
+
+    .site-domain-line {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .site-domain {
+      font-family: var(--body);
+      font-size: 19px;
+      word-break: break-all;
+    }
+
+    .site-count,
+    .site-arrow {
+      font-size: 12px;
+      color: var(--ink-muted);
+      letter-spacing: 0.06em;
+    }
+
+    .site-summary {
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--ink-muted);
+      letter-spacing: 0.04em;
+    }
+
+    .site-editor {
+      flex: 999 1 460px;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .editor-head {
+      padding-top: 14px;
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .editor-domain {
+      font-family: var(--body);
+      font-size: 34px;
+      line-height: 1.15;
+      word-break: break-all;
+    }
+
+    .editor-actions {
+      display: flex;
+      gap: 18px;
+    }
+
+    .editor-scope {
+      margin: 6px 0 0;
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--ink-muted);
+    }
+
+    .editor-note {
+      margin: 10px 0 0;
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--accent);
+    }
+
+    .editor-group {
+      margin-top: 26px;
+    }
+
+    .editor-group-title {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--rule-soft);
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.2em;
+      color: var(--ink-muted);
+    }
+
+    .editor-group-title .num {
+      font-family: var(--display-zh);
+      font-weight: 400;
+      color: var(--ink);
+    }
+
+    .editor-copy {
+      margin: 12px 0 0 auto;
+    }
+
+    .empty {
+      margin: 18px 0 0;
+      font-size: 15px;
+      line-height: 1.8;
+      color: var(--ink-muted);
+    }
+
+    /* ---------- 生词本 ---------- */
+
+    .vocab-actions {
+      margin-top: 28px;
+      display: flex;
+      align-items: flex-end;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+
+    .vocab-actions .text-btn {
+      margin-bottom: 8px;
+      font-size: 15px;
+    }
+
+    .search {
+      margin-left: auto;
+      flex: 0 1 240px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1.5px solid var(--ink);
+      padding-bottom: 6px;
+      color: var(--ink-muted);
+    }
+
+    .search input {
+      appearance: none;
+      width: 100%;
+      border: 0;
+      background: transparent;
+      color: var(--ink);
+      font-family: var(--body);
+      font-size: 16px;
+      outline: none;
+    }
+
+    .word-row {
+      display: flex;
+      align-items: baseline;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--rule-soft);
+    }
+
+    .word-row .leader {
+      align-self: auto;
+      transform: translateY(-5px);
+    }
+
+    .word {
+      font-family: var(--body);
+      font-size: 20px;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .reading {
+      margin-left: 10px;
+      font-family: var(--body);
+      font-size: 14px;
+      font-style: italic;
+      /* 假名没有真斜体，别让浏览器硬拉斜 */
+      font-synthesis: none;
+      color: var(--ink-muted);
+      white-space: nowrap;
+    }
+
+    .meaning {
+      font-size: 15px;
+      letter-spacing: 0.04em;
+      text-align: right;
+      max-width: 45%;
+    }
+
+    .lang {
+      width: 32px;
+      flex: none;
+      text-align: right;
+      font-family: var(--smallcaps);
+      font-variant-caps: small-caps;
+      font-size: 14px;
+      color: var(--ink-muted);
+    }
+
+    .row-actions {
+      display: flex;
+      gap: 14px;
+      margin-left: 20px;
+      flex: none;
+    }
+
+    .row-actions .text-btn {
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      color: var(--ink-muted);
+      text-decoration: none;
+    }
+
+    .row-actions .text-btn:hover {
+      color: var(--accent);
+    }
+
+    .pager {
+      padding-top: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      font-size: 13px;
+      letter-spacing: 0.1em;
+      color: var(--ink-muted);
+    }
+
+    .pager .text-btn {
+      font-size: 13px;
+      text-decoration: none;
+    }
+
+    /* ---------- 连接 ---------- */
+
+    .conn-status {
+      margin: 6px 0 0;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--ink-muted);
+    }
+
+    .key-cap {
+      padding: 3px 10px;
+      border: 1.5px solid var(--ink);
+      font-family: var(--body);
+      font-size: 16px;
+      letter-spacing: 0.08em;
+      white-space: nowrap;
+    }
+
+    .hint-split {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    @media (max-width: 640px) {
+      .toc {
+        border-right: 0;
+        border-bottom: 1px solid var(--ink);
+        padding: 28px 20px 20px;
+      }
+
+      main {
+        padding: 32px 20px 64px;
+      }
+
+      h1 {
+        font-size: 44px;
+      }
+
+      .row {
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .row .leader {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <nav class="toc" aria-label="设置目录">
+      <div>
+        <div class="brand">划词翻译</div>
+        <div class="brand-sub">llm context translator</div>
+      </div>
+      <div class="double-rule"></div>
+      <ol class="contents">
+        <li><a href="#defaults" data-page="defaults"><span>默认配置</span><span class="leader"></span><span class="num">壹</span></a></li>
+        <li><a href="#sites" data-page="sites"><span>站点配置</span><span class="count" id="siteCount"></span><span class="leader"></span><span class="num">贰</span></a></li>
+        <li><a href="#vocab" data-page="vocab"><span>生词本</span><span class="count" id="vocabCount"></span><span class="leader"></span><span class="num">叁</span></a></li>
+        <li><a href="#connection" data-page="connection"><span>连接与快捷键</span><span class="leader"></span><span class="num">肆</span></a></li>
+      </ol>
+      <div class="colophon">第壹版 · <span id="version"></span></div>
+    </nav>
+
+    <main>
+      <!-- 壹 默认配置 -->
+      <section class="page" id="page-defaults" data-page="defaults" hidden>
+        <div class="chapter">壹</div>
+        <h1>默认配置</h1>
+        <svg class="ornament" width="60" height="12" viewBox="0 0 60 12" aria-hidden="true"><line x1="0" y1="6" x2="22" y2="6" stroke="currentColor" stroke-width="1"></line><path d="M30 1 L35 6 L30 11 L25 6 Z" fill="none" stroke="currentColor" stroke-width="1.2"></path><line x1="38" y1="6" x2="60" y2="6" stroke="currentColor" stroke-width="1"></line></svg>
+        <p class="lead">所有网站默认使用这里的设定。要让某个网站不一样，到 <a href="#sites" class="wavy">站点配置</a> 里单独设定。改动即时保存。</p>
+        <div id="defaultsForm"></div>
+      </section>
+
+      <!-- 贰 站点配置 -->
+      <section class="page page-wide" id="page-sites" data-page="sites" hidden>
+        <div class="page-head">
+          <div>
+            <div class="chapter">贰</div>
+            <h1>站点配置</h1>
+            <svg class="ornament" width="60" height="12" viewBox="0 0 60 12" aria-hidden="true"><line x1="0" y1="6" x2="22" y2="6" stroke="currentColor" stroke-width="1"></line><path d="M30 1 L35 6 L30 11 L25 6 Z" fill="none" stroke="currentColor" stroke-width="1.2"></path><line x1="38" y1="6" x2="60" y2="6" stroke="currentColor" stroke-width="1"></line></svg>
+          </div>
+          <button type="button" class="stamp" id="addSiteButton" aria-expanded="false" aria-controls="addSitePop" style="margin-top: 6px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>添加站点
+          </button>
+        </div>
+        <div class="add-pop" id="addSitePop" role="dialog" aria-label="添加站点" hidden>
+          <label>
+            <span class="small-label">域名或网址</span>
+            <input type="text" class="field" id="addSiteInput" placeholder="例如 youtube.com" spellcheck="false" autocomplete="off">
+          </label>
+          <p class="row-hint" style="margin: 0;">粘贴网址也行，会自动取出域名。子域名一并适用：填 google.com，docs.google.com 也会套用。</p>
+          <p class="add-error" id="addSiteError" hidden></p>
+          <div class="add-pop-actions">
+            <button type="button" class="text-btn is-muted" id="addSiteCancel">取消</button>
+            <button type="button" class="stamp" id="addSiteConfirm">添加</button>
+          </div>
+        </div>
+        <p class="lead">为特定网站单独设定。没改的项目跟随 <a href="#defaults" class="wavy">默认配置</a>，默认配置变了，它们也跟着变。</p>
+        <h2 class="sec">已设定的站点<span class="count" id="siteCountInline"></span></h2>
+        <div class="sites">
+          <div class="site-list" id="siteList"></div>
+          <div class="site-editor" id="siteEditor"></div>
+        </div>
+      </section>
+
+      <!-- 叁 生词本 -->
+      <section class="page" id="page-vocab" data-page="vocab" hidden>
+        <div class="chapter">叁</div>
+        <h1>生词本</h1>
+        <svg class="ornament" width="60" height="12" viewBox="0 0 60 12" aria-hidden="true"><line x1="0" y1="6" x2="22" y2="6" stroke="currentColor" stroke-width="1"></line><path d="M30 1 L35 6 L30 11 L25 6 Z" fill="none" stroke="currentColor" stroke-width="1.2"></path><line x1="38" y1="6" x2="60" y2="6" stroke="currentColor" stroke-width="1"></line></svg>
+        <p class="lead" id="vocabLead">收藏会和后端同步，换设备也在。</p>
+        <div class="vocab-actions">
+          <button type="button" class="stamp" id="reviewButton">开始复习</button>
+          <button type="button" class="text-btn" id="exportButton">导出 CSV</button>
+          <label class="search">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line></svg>
+            <input type="search" id="vocabSearch" placeholder="搜索收藏" aria-label="搜索收藏">
+          </label>
+        </div>
+        <h2 class="sec"><span class="num">一</span>收藏</h2>
+        <div id="favoritesList"></div>
+        <div class="pager" id="favoritesPager" hidden></div>
+        <h2 class="sec"><span class="num">二</span>最近查询</h2>
+        <div id="historyList"></div>
+        <p class="row-hint" style="margin-top: 10px;">只保留最近 50 条，存在本机。</p>
+      </section>
+
+      <!-- 肆 连接与快捷键 -->
+      <section class="page" id="page-connection" data-page="connection" hidden>
+        <div class="chapter">肆</div>
+        <h1>连接与快捷键</h1>
+        <svg class="ornament" width="60" height="12" viewBox="0 0 60 12" aria-hidden="true"><line x1="0" y1="6" x2="22" y2="6" stroke="currentColor" stroke-width="1"></line><path d="M30 1 L35 6 L30 11 L25 6 Z" fill="none" stroke="currentColor" stroke-width="1.2"></path><line x1="38" y1="6" x2="60" y2="6" stroke="currentColor" stroke-width="1"></line></svg>
+        <p class="lead">这些设定对所有网站都一样，不受站点配置影响。</p>
+
+        <h2 class="sec"><span class="num">一</span>后端</h2>
+        <div class="row">
+          <label for="apiBaseInput" class="row-label">后端地址</label>
+          <span class="leader"></span>
+          <input id="apiBaseInput" class="field" type="text" placeholder="http://localhost:8000" spellcheck="false" autocomplete="off" style="width: 300px;">
+        </div>
+        <p class="conn-status"><span class="status-dot" id="statusDot"></span><span id="statusText">检查中</span></p>
+        <div class="row">
+          <label for="tokenInput" class="row-label">访问令牌</label>
+          <span class="leader"></span>
+          <span style="display: inline-flex; align-items: flex-end; gap: 12px;">
+            <input id="tokenInput" class="field" type="password" placeholder="与后端一致的 token" spellcheck="false" autocomplete="off" style="width: 240px;">
+            <button type="button" class="text-btn is-muted" id="tokenToggle" style="font-size: 13px; padding-bottom: 6px;">显示</button>
+          </span>
+        </div>
+        <p class="row-hint">保存在 Chrome 账号里，随账号同步到所有设备。必须和后端 .env 里的 LCT_ACCESS_TOKEN 一致。</p>
+
+        <h2 class="sec"><span class="num">二</span>快捷键</h2>
+        <div class="row">
+          <span class="row-label">开关划词翻译</span>
+          <span class="leader"></span>
+          <span class="key-cap" id="shortcutKey">加载中</span>
+        </div>
+        <p class="row-hint hint-split"><span>就是弹出窗口里的总开关。快捷键由 Chrome 管理。</span><button type="button" class="text-btn" id="shortcutCustomizeButton" style="font-size: 13px; white-space: nowrap;">在 Chrome 中修改 →</button></p>
+      </section>
+    </main>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="favorites-api.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>
