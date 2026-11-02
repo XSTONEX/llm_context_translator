@@ -22,6 +22,11 @@
   const PANEL_SIZE_KEY = 'panelSize';
   let panelSize = null;
   let themeListenersBound = false;
+  // 皮肤是全局设定，不走站点配置：paper = 纸页，clear = 明净
+  let skin = typeof DEFAULT_SKIN !== 'undefined' ? DEFAULT_SKIN : 'paper';
+  const skinKey = typeof SKIN_KEY !== 'undefined' ? SKIN_KEY : 'skin';
+  // 读到皮肤之前不加载纸页字体，免得明净用户白下一次
+  let skinLoaded = false;
   let copyWordFields = typeof getDefaultCopyWordFields === 'function'
     ? getDefaultCopyWordFields()
     : [
@@ -49,6 +54,24 @@
         ? resolveEffectiveTheme
         : (mode) => (mode === 'dark' ? 'dark' : 'light');
     hostElement.dataset.theme = resolve(themeMode);
+  }
+
+  function setSkin(value) {
+    skin = typeof normalizeSkin === 'function' ? normalizeSkin(value) : (value === 'clear' ? 'clear' : 'paper');
+    skinLoaded = true;
+    if (hostElement) hostElement.dataset.skin = skin;
+    // 明净用系统字体；切回纸页时如果面板已经建好，要补上衬线字体
+    if (skin === 'paper' && panelElement) loadPanelFonts();
+  }
+
+  function loadSkin() {
+    try {
+      chrome.storage.local.get([skinKey], (result) => {
+        setSkin(result && result[skinKey]);
+      });
+    } catch (e) {
+      // storage API 在部分测试环境可能不可用
+    }
   }
 
   // 外观和复制内容都可按站点覆盖，从合并后的生效设置里取
@@ -84,6 +107,7 @@
         if (changes[PANEL_SIZE_KEY]) {
           panelSize = normalizePanelSize(changes[PANEL_SIZE_KEY].newValue);
         }
+        if (changes[skinKey]) setSkin(changes[skinKey].newValue);
       });
     } catch (e) {
       // storage API 在部分测试环境可能不可用
@@ -120,7 +144,9 @@
     state.dragEventsBound = false;
 
     applyThemeToHost();
+    hostElement.dataset.skin = skin;
     loadAndApplyTheme();
+    loadSkin();
     loadPanelSize();
     bindThemeListeners();
     loadStyles();
@@ -235,7 +261,7 @@
     panelElement.style.pointerEvents = 'auto';
     shadowRoot.appendChild(panelElement);
     bindPanelEvents();
-    loadPanelFonts();
+    if (skinLoaded && skin === 'paper') loadPanelFonts();
     return panelElement;
   }
 
@@ -1263,6 +1289,8 @@
       const num = document.createElement('sup');
       num.classList.add('lct-expression-num');
       num.textContent = ROMAN[index] || String(index + 1);
+      // 明净皮肤显示阿拉伯数字
+      num.dataset.n = String(index + 1);
       item.appendChild(num);
       const leader = document.createElement('span');
       leader.classList.add('lct-leader');
@@ -1634,4 +1662,7 @@
     createIconButton,
     showCopyFeedback
   };
+
+  // 脚本加载时就把皮肤读好，第一次弹触发图标 / 面板时不会先闪一下另一套
+  loadSkin();
 })();

@@ -34,6 +34,7 @@ const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
   shown.push(...[...options.matchAll(/<h1>([^<]+)<\/h1>/g)].map((m) => m[1]));
   shown.push(...[...options.matchAll(/class="(?:brand|chapter|num)">([^<]+)</g)].map((m) => m[1]));
   shown.push(...[...read('popup.html').matchAll(/class="popup-title">([^<]+)</g)].map((m) => m[1]));
+  shown.push(...[...read('review.html').matchAll(/class="review-title">([^<]+)</g)].map((m) => m[1]));
   shown.push(...[...read('options.js').matchAll(/GROUP_NUMS = \[([^\]]+)\]/g)].map((m) => m[1].replace(/[',\s]/g, '')));
   shown.push(read('content-panel.js').match(/textContent = '(翻译[^']*失败)'/)[1]);
 

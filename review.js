@@ -6,12 +6,15 @@
 
 const stage = document.getElementById('stage');
 const progressEl = document.getElementById('progress');
+const progressBox = document.getElementById('progressBox');
+const progressFill = document.getElementById('progressFill');
 
 let deck = [];
 let index = 0;
 let flipped = false;
 let themeMode = typeof DEFAULT_THEME_MODE !== 'undefined' ? DEFAULT_THEME_MODE : 'system';
 const themeKey = typeof THEME_MODE_KEY !== 'undefined' ? THEME_MODE_KEY : 'themeMode';
+const skinKey = typeof SKIN_KEY !== 'undefined' ? SKIN_KEY : 'skin';
 
 // 当前卡片发音
 let currentAudio = null;
@@ -45,14 +48,22 @@ function setThemeMode(mode) {
   applyDocumentTheme(themeMode);
 }
 
+function applySkin(value) {
+  const normalize =
+    typeof normalizeSkin === 'function' ? normalizeSkin : (v) => (v === 'clear' ? 'clear' : 'paper');
+  document.documentElement.dataset.skin = normalize(value);
+}
+
 function initTheme() {
-  chrome.storage.local.get([themeKey], (result) => {
+  chrome.storage.local.get([themeKey, skinKey], (result) => {
     setThemeMode(result[themeKey]);
+    applySkin(result[skinKey]);
   });
 
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area !== 'local' || !changes[themeKey]) return;
-    setThemeMode(changes[themeKey].newValue);
+    if (area !== 'local') return;
+    if (changes[themeKey]) setThemeMode(changes[themeKey].newValue);
+    if (changes[skinKey]) applySkin(changes[skinKey].newValue);
   });
 
   try {
@@ -119,9 +130,11 @@ function updateSpeakButton() {
   speakBtnEl.classList.toggle('is-loading', audioLoading);
   speakBtnEl.classList.toggle('is-error', audioError && !audioLoading);
   speakBtnEl.disabled = audioLoading || deck.length === 0;
-  if (audioLoading) speakBtnEl.textContent = '加载中';
-  else if (audioError) speakBtnEl.textContent = '重试发音';
-  else speakBtnEl.textContent = '发音';
+  let label = '发音';
+  if (audioLoading) label = '发音加载中';
+  else if (audioError) label = '发音失败，点一下重试';
+  speakBtnEl.setAttribute('aria-label', label);
+  speakBtnEl.title = label;
 }
 
 async function playCurrentWord() {
@@ -159,48 +172,58 @@ async function playCurrentWord() {
   }
 }
 
+const SPEAKER_SVG =
+  '<svg width="17" height="17" viewBox="0 0 20 20" fill="none" aria-hidden="true">' +
+  '<path d="M3.5 7.5h3L10.5 4v12l-4-3.5h-3v-5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"></path>' +
+  '<path d="M13.5 7.2a4 4 0 0 1 0 5.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>';
+
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text != null) node.textContent = text;
+  return node;
+}
+
 function render() {
   stage.innerHTML = '';
   speakBtnEl = null;
 
   if (deck.length === 0) {
     stopAudio();
-    progressEl.textContent = '';
-    const empty = document.createElement('div');
-    empty.classList.add('empty');
-    empty.innerHTML = '生词本还是空的。<br>在网页上划词翻译后，点击面板里的 ★ 收藏，就会出现在这里。';
+    progressBox.hidden = true;
+    const empty = el('p', 'empty');
+    empty.innerHTML = '生词本还是空的。<br>在网页上划词翻译后，点击面板里的星标收藏，就会出现在这里。';
     stage.appendChild(empty);
     return;
   }
 
   const item = deck[index];
+  progressBox.hidden = false;
   progressEl.textContent = `${index + 1} / ${deck.length}`;
+  progressFill.style.width = ((index + 1) / deck.length) * 100 + '%';
 
-  const card = document.createElement('div');
-  card.classList.add('card');
+  const card = el('article', 'card');
   card.addEventListener('click', flip);
 
-  const langTag = document.createElement('div');
-  langTag.classList.add('card-lang');
-  langTag.textContent = langLabel(item.lang);
-  card.appendChild(langTag);
+  const top = el('div', 'card-top');
+  top.appendChild(el('span', 'card-lang', langLabel(item.lang)));
+  speakBtnEl = el('button', 'ring');
+  speakBtnEl.type = 'button';
+  speakBtnEl.innerHTML = SPEAKER_SVG;
+  speakBtnEl.addEventListener('click', (e) => {
+    e.stopPropagation();
+    playCurrentWord();
+  });
+  top.appendChild(speakBtnEl);
+  card.appendChild(top);
 
   if (!flipped) {
-    const row = document.createElement('div');
-    row.classList.add('card-front-row');
-
-    const word = document.createElement('div');
-    word.classList.add('card-front-word');
-    word.textContent = item.query || '--';
-    row.appendChild(word);
-    card.appendChild(row);
-
-    const hint = document.createElement('div');
-    hint.classList.add('card-hint');
-    hint.textContent = '点击卡片或按空格查看释义';
-    card.appendChild(hint);
+    const line = el('div', 'card-wordline');
+    line.appendChild(el('span', 'card-word', item.query || '--'));
+    card.appendChild(line);
+    card.appendChild(el('div', 'card-hint', '点击卡片或按空格查看释义'));
   } else {
-    card.appendChild(buildBack(item));
+    buildBack(item).forEach((node) => card.appendChild(node));
   }
 
   stage.appendChild(card);
@@ -210,53 +233,34 @@ function render() {
 }
 
 function buildBack(item) {
-  const back = document.createElement('div');
-  back.classList.add('card-back');
-
-  const word = document.createElement('div');
-  word.classList.add('card-front-word');
-  word.textContent = item.query || '--';
-  back.appendChild(word);
-
-  if (item.phonetic) {
-    const reading = document.createElement('div');
-    reading.classList.add('back-reading');
-    reading.textContent = item.phonetic;
-    back.appendChild(reading);
-  }
+  const nodes = [];
+  const line = el('div', 'card-wordline');
+  line.appendChild(el('span', 'card-word', item.query || '--'));
+  if (item.phonetic) line.appendChild(el('span', 'card-reading', item.phonetic));
+  nodes.push(line);
 
   const core = item.coreTranslation || item.translation || '';
-  if (core) {
-    const coreEl = document.createElement('div');
-    coreEl.classList.add('back-core');
-    coreEl.textContent = core;
-    back.appendChild(coreEl);
-  }
+  if (core) nodes.push(el('div', 'card-core', core));
 
   if (Array.isArray(item.definitions) && item.definitions.length > 0) {
-    const defs = document.createElement('div');
-    defs.classList.add('back-defs');
+    const defs = el('div', 'card-defs');
     item.definitions.forEach((d) => {
-      const row = document.createElement('div');
-      row.classList.add('back-def');
+      const row = el('div', 'card-def');
       if (d.partOfSpeech) {
-        const pos = document.createElement('span');
-        pos.classList.add('pos');
-        pos.textContent = d.partOfSpeech;
-        row.appendChild(pos);
+        row.appendChild(el('span', 'pos', d.partOfSpeech));
+        row.appendChild(el('span', 'leader'));
       }
-      row.appendChild(document.createTextNode(d.meaning || ''));
+      row.appendChild(el('span', 'def-meaning', d.meaning || ''));
       defs.appendChild(row);
     });
-    back.appendChild(defs);
+    nodes.push(defs);
   }
 
-  return back;
+  return nodes;
 }
 
 function buildControls() {
-  const controls = document.createElement('div');
-  controls.classList.add('controls');
+  const controls = el('div', 'controls');
 
   const prevBtn = makeBtn('上一张', prev, 'btn');
   prevBtn.disabled = index === 0;
@@ -268,29 +272,22 @@ function buildControls() {
   nextBtn.disabled = index >= deck.length - 1;
   controls.appendChild(nextBtn);
 
-  speakBtnEl = makeBtn('发音', () => {
-    playCurrentWord();
-  }, 'btn btn-speak');
-  speakBtnEl.addEventListener('click', (e) => e.stopPropagation());
-  controls.appendChild(speakBtnEl);
-
-  controls.appendChild(makeBtn('随机重排', reshuffle, 'btn'));
-  controls.appendChild(makeBtn('移出生词本', removeCurrent, 'btn btn-danger'));
+  controls.appendChild(el('span', 'spacer'));
+  controls.appendChild(makeBtn('随机重排', reshuffle, 'btn btn-quiet'));
+  controls.appendChild(makeBtn('移出生词本', removeCurrent, 'btn btn-quiet btn-danger'));
 
   return controls;
 }
 
 function makeBtn(label, handler, cls) {
-  const btn = document.createElement('button');
-  btn.className = cls;
-  btn.textContent = label;
+  const btn = el('button', cls, label);
+  btn.type = 'button';
   btn.addEventListener('click', handler);
   return btn;
 }
 
 function buildKbdHint() {
-  const hint = document.createElement('div');
-  hint.classList.add('kbd-hint');
+  const hint = el('p', 'kbd-hint');
   hint.innerHTML =
     '<span class="kbd">空格</span> 翻面 · <span class="kbd">←</span> 上一张 · <span class="kbd">→</span> 下一张 · <span class="kbd">S</span> 发音';
   return hint;

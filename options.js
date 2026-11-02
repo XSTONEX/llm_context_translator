@@ -67,6 +67,14 @@ const SETTING_GROUPS = [
     title: '面板',
     items: [
       {
+        // 全局一份，只出现在默认配置里
+        key: 'skin',
+        label: '皮肤',
+        type: 'skin',
+        global: true,
+        hint: '弹出窗口、设置页、复习页和网页上的面板一起换。只有这一处能改，站点配置里没有这一项。'
+      },
+      {
         key: 'themeMode',
         label: '外观',
         siteLabel: '面板外观',
@@ -84,6 +92,8 @@ const SETTING_GROUPS = [
   }
 ];
 
+const SKIN_CHOICES = [['paper', '纸页'], ['clear', '明净']];
+
 const SETTING_ITEMS = {};
 SETTING_GROUPS.forEach((group) => {
   group.items.forEach((item) => {
@@ -94,6 +104,7 @@ SETTING_GROUPS.forEach((group) => {
 const state = {
   raw: {},
   defaults: readDefaultSettings({}),
+  skin: DEFAULT_SKIN,
   profiles: [],
   models: [],
   page: 'defaults',
@@ -187,6 +198,13 @@ function setDefault(key, value) {
   chrome.storage.local.set(patch);
 }
 
+function setSkin(value) {
+  state.skin = normalizeSkin(value);
+  applyDocumentTheme();
+  renderDefaults();
+  chrome.storage.local.set({ [SKIN_KEY]: state.skin });
+}
+
 function saveProfiles(profiles) {
   state.raw[SITE_PROFILES_KEY] = profiles;
   applyRaw(state.raw);
@@ -251,9 +269,10 @@ function init() {
   bindConnection();
 
   chrome.storage.local.get(
-    SITE_STORAGE_KEYS.concat(['apiBase', 'modelList', 'favoriteLookups', 'lookupHistory']),
+    SITE_STORAGE_KEYS.concat([SKIN_KEY, 'apiBase', 'modelList', 'favoriteLookups', 'lookupHistory']),
     (result) => {
       applyRaw(Object.assign({}, result));
+      state.skin = normalizeSkin(result[SKIN_KEY]);
       state.models = Array.isArray(result.modelList) ? result.modelList : [];
       state.favorites = Array.isArray(result.favoriteLookups) ? result.favoriteLookups : [];
       state.history = Array.isArray(result.lookupHistory) ? result.lookupHistory : [];
@@ -301,6 +320,11 @@ function onStorageChanged(changes, area) {
     applyDocumentTheme();
     renderSettings();
   }
+  if (changes[SKIN_KEY]) {
+    state.skin = normalizeSkin(changes[SKIN_KEY].newValue);
+    applyDocumentTheme();
+    renderDefaults();
+  }
   if (changes.modelList) {
     state.models = Array.isArray(changes.modelList.newValue) ? changes.modelList.newValue : [];
     renderSettings();
@@ -317,6 +341,7 @@ function onStorageChanged(changes, area) {
 
 function applyDocumentTheme() {
   document.documentElement.dataset.theme = resolveEffectiveTheme(state.defaults.themeMode);
+  document.documentElement.dataset.skin = state.skin;
 }
 
 // #defaults / #sites / #sites/<域名> / #vocab / #connection
@@ -493,13 +518,21 @@ function renderDefaults() {
   form.textContent = '';
 
   SETTING_GROUPS.forEach((group, gi) => {
-    form.appendChild(h('h2', { class: 'sec' }, h('span', { class: 'num', text: GROUP_NUMS[gi] }), group.title));
+    // 每组包一层：纸页里只是一段，明净里是一张卡片
+    const groupEl = h(
+      'section',
+      { class: 'group' },
+      h('h2', { class: 'sec' }, h('span', { class: 'num', text: GROUP_NUMS[gi] }), group.title)
+    );
     group.items.forEach((item) => {
       const value = state.defaults[item.key];
       let control;
       let top = false;
 
-      if (item.type === 'seg') {
+      if (item.type === 'skin') {
+        top = true;
+        control = buildSkinPicker(state.skin);
+      } else if (item.type === 'seg') {
         control = buildSeg(item.label, item.options.map(([optValue, text]) => ({
           text,
           pressed: sameValue(optValue, value),
@@ -513,16 +546,59 @@ function renderDefaults() {
         control = buildCopyList(value, (fields) => setDefault('copyWordFields', fields), false);
       }
 
-      form.appendChild(h(
+      groupEl.appendChild(h(
         'div',
-        { class: 'row' + (top ? ' is-top' : '') },
-        h('span', { class: 'row-label', text: item.label, style: top ? 'padding-top: 8px;' : null }),
-        h('span', { class: 'leader' }),
-        control
+        { class: 'row-group' },
+        h(
+          'div',
+          { class: 'row' + (top ? ' is-top' : '') },
+          h('span', { class: 'row-label', text: item.label }),
+          h('span', { class: 'leader' }),
+          control
+        ),
+        item.hint ? h('p', { class: 'row-hint', text: item.hint }) : null
       ));
-      if (item.hint) form.appendChild(h('p', { class: 'row-hint', text: item.hint }));
     });
+    form.appendChild(groupEl);
   });
+}
+
+// 两张预览卡；预览用固定颜色，换皮肤时它们自己不变
+function buildSkinPicker(value) {
+  return h(
+    'div',
+    { class: 'skin-pick', role: 'radiogroup', 'aria-label': '皮肤' },
+    SKIN_CHOICES.map(([id, name]) => h(
+      'button',
+      {
+        type: 'button',
+        class: 'skin-card',
+        role: 'radio',
+        'aria-checked': id === value ? 'true' : 'false',
+        onClick: () => setSkin(id)
+      },
+      skinPreview(id),
+      h('span', { class: 'skin-name', text: name })
+    ))
+  );
+}
+
+function skinPreview(id) {
+  if (id === 'paper') {
+    return h(
+      'span',
+      { class: 'skin-preview is-paper', 'aria-hidden': 'true' },
+      h('span', { class: 'sp-title', text: '划词翻译' }),
+      h('span', { class: 'sp-rule' }),
+      h('span', { class: 'sp-row' }, h('span', { text: '发音' }), h('span', { class: 'sp-leader' }), h('span', { class: 'sp-seg', text: '开' }))
+    );
+  }
+  return h(
+    'span',
+    { class: 'skin-preview is-clear', 'aria-hidden': 'true' },
+    h('span', { class: 'sp-title', text: '划词翻译' }),
+    h('span', { class: 'sp-card' }, h('span', { text: '发音' }), h('span', { class: 'sp-seg' }, h('b', { text: '开' }), h('span', { text: '关' })))
+  );
 }
 
 // ---------- 贰 站点配置 ----------
@@ -693,7 +769,7 @@ function renderSiteEditor() {
         group.title
       )
     );
-    group.items.forEach((item) => {
+    group.items.filter((item) => !item.global).forEach((item) => {
       groupEl.appendChild(buildSiteRow(domain, item, profile.overrides, base, effective));
     });
     editor.appendChild(groupEl);
@@ -769,7 +845,7 @@ function buildSiteRow(domain, item, overrides, base, effective) {
     { class: 'row-group' + (dim ? ' is-dim' : '') },
     h(
       'div',
-      { class: 'row', style: 'padding-top: 14px;' },
+      { class: 'row' },
       h(
         'div',
         { class: 'row-label-block' },

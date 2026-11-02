@@ -16,7 +16,7 @@ Alegreya 只留拉丁字母、IPA 和常用标点；ZCOOL XiaoWei 只留界面�
 **改了用 `--display-zh` / `--lct-display-zh` 显示的文字，要把新字加进下面的 `ZH_TEXT` 重新生成**，否则缺的字会落到系统宋体。
 
 ```bash
-ZH_TEXT='划词翻译默认配置站点配置生词本连接与快捷键壹贰叁肆一二三四翻译暂时失败'
+ZH_TEXT='划词翻译默认配置站点配置生词本复习连接与快捷键壹贰叁肆一二三四翻译暂时失败'
 LATIN='U+0000-00FF,U+0100-017F,U+0131,U+0152-0153,U+0250-02FF,U+0300-036F,U+1D00-1DBF,U+2000-206F,U+2070-209F,U+20AC,U+2122,U+2190-2193,U+2212,U+2215,U+FEFF,U+FFFD'
 python3 -m fontTools.subset ZCOOLXiaoWei-Regular.ttf --text="$ZH_TEXT" --unicodes='U+0020' --flavor=woff2 --output-file=fonts/ZCOOLXiaoWei-subset.woff2
 python3 -m fontTools.subset 'Alegreya[wght].ttf' --unicodes="$LATIN" --layout-features='*' --flavor=woff2 --output-file=fonts/Alegreya-wght.woff2
@@ -27,5 +27,6 @@ python3 -m fontTools.subset 'Alegreya-Italic[wght].ttf' --unicodes="$LATIN" --la
 
 ## 怎么加载
 
-- popup / 设置页：`paper.css` 里的 `@font-face`。
+- popup / 设置页 / 复习页：`paper.css` 里的 `@font-face`。
+- 只有纸页皮肤用这些字体；明净皮肤全用系统字体，不会下载它们（面板读到皮肤是明净时也不注册）。
 - 网页上的划词面板：Shadow DOM 里的 `@font-face` 不生效，由 `content-panel.js` 第一次弹面板时 fetch 字体字节、用 `FontFace` 注册到 `document.fonts`。所以 `manifest.json` 的 `web_accessible_resources` 要包含 `fonts/*.woff2`。

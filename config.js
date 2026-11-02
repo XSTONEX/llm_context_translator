@@ -30,6 +30,20 @@ function resolveEffectiveTheme(themeMode) {
   }
 }
 
+// ---------- 皮肤（全局一份，不能按站点覆盖；popup / 设置页 / review / 网页面板一起换） ----------
+// paper = 纸页（Odyssey Paper），clear = 明净（IELTS Lab 写作页的样式）
+// eslint-disable-next-line no-var
+var SKIN_KEY = 'skin';
+// eslint-disable-next-line no-var
+var SKINS = ['paper', 'clear'];
+// eslint-disable-next-line no-var
+var DEFAULT_SKIN = 'paper';
+
+// eslint-disable-next-line no-unused-vars
+function normalizeSkin(value) {
+  return SKINS.indexOf(value) !== -1 ? value : DEFAULT_SKIN;
+}
+
 // ---------- 单词复制字段（设置页配置，可按站点覆盖；content 面板工具栏复制读取） ----------
 // eslint-disable-next-line no-var
 var COPY_WORD_FIELDS_KEY = 'copyWordFields';

@@ -196,6 +196,14 @@
       margin-top: 18px;
     }
 
+    .row.is-top .row-label {
+      padding-top: 8px;
+    }
+
+    .site-editor .row {
+      padding-top: 14px;
+    }
+
     .row-label {
       font-size: 16px;
       letter-spacing: 0.14em;
@@ -671,6 +679,161 @@
       gap: 16px;
     }
 
+    /* ---------- 皮肤选择：两张预览卡（预览用固定颜色） ---------- */
+
+    .skin-pick {
+      display: flex;
+      gap: 14px;
+      flex: none;
+    }
+
+    .skin-card {
+      appearance: none;
+      width: 156px;
+      margin: 0 4px 4px 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      text-align: left;
+      background: transparent;
+      color: var(--ink);
+      border: 1.5px solid var(--rule-soft);
+      cursor: pointer;
+      transition: border-color 0.12s, box-shadow 0.12s;
+    }
+
+    .skin-card:hover {
+      border-color: var(--ink);
+    }
+
+    .skin-card[aria-checked="true"] {
+      border-color: var(--ink);
+      box-shadow: 4px 4px 0 var(--ink);
+    }
+
+    .skin-name {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      padding: 6px 10px;
+      border-top: 1px solid var(--rule-soft);
+      font-size: 15px;
+      letter-spacing: 0.12em;
+    }
+
+    .skin-card[aria-checked="true"] .skin-name {
+      border-top-color: var(--ink);
+      font-weight: 600;
+    }
+
+    .skin-card[aria-checked="true"] .skin-name::after {
+      content: '当前';
+      font-size: 12px;
+      font-weight: 400;
+      letter-spacing: 0.04em;
+      color: var(--ink-muted);
+    }
+
+    .skin-preview {
+      height: 72px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .skin-preview.is-paper {
+      background: #e4e2d7;
+      color: #141412;
+      font-family: 'Songti SC', 'STSong', serif;
+    }
+
+    .is-paper .sp-title {
+      font-family: 'LCT ZCOOL XiaoWei', 'Songti SC', serif;
+      font-size: 17px;
+      line-height: 1.1;
+      letter-spacing: 0.06em;
+    }
+
+    .is-paper .sp-rule {
+      border-top: 2px solid #141412;
+      padding-top: 2px;
+    }
+
+    .is-paper .sp-rule::after {
+      content: '';
+      display: block;
+      border-top: 1px solid #141412;
+    }
+
+    .is-paper .sp-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+    }
+
+    .is-paper .sp-leader {
+      flex: 1;
+      border-bottom: 1.5px dotted #57544c;
+    }
+
+    .is-paper .sp-seg {
+      padding: 0 4px;
+      background: #141412;
+      color: #e4e2d7;
+    }
+
+    .skin-preview.is-clear {
+      background: #f7f7f5;
+      color: #1f1f1f;
+      font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    }
+
+    .is-clear .sp-title {
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.3;
+    }
+
+    .is-clear .sp-card {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 8px;
+      background: #ffffff;
+      border: 1px solid #e3e3df;
+      border-radius: 5px;
+      font-size: 11px;
+      color: #555555;
+    }
+
+    .is-clear .sp-seg {
+      display: inline-flex;
+      padding: 2px;
+      border-radius: 4px;
+      background: #e8e8e4;
+    }
+
+    .is-clear .sp-seg b {
+      padding: 0 5px;
+      border-radius: 3px;
+      background: #ffffff;
+      color: #1f1f1f;
+      box-shadow: 0 0 0 1px #e3e3df;
+    }
+
+    .is-clear .sp-seg span {
+      padding: 0 5px;
+    }
+
+    /* 目录图标和「版本」只在明净里出现 */
+    .toc-icon {
+      display: none;
+    }
+
     @media (max-width: 640px) {
       .toc {
         border-right: 0;
@@ -696,6 +859,7 @@
       }
     }
   </style>
+  <link rel="stylesheet" href="clear.css">
 </head>
 <body>
   <div class="shell">
@@ -706,12 +870,12 @@
       </div>
       <div class="double-rule"></div>
       <ol class="contents">
-        <li><a href="#defaults" data-page="defaults"><span>默认配置</span><span class="leader"></span><span class="num">壹</span></a></li>
-        <li><a href="#sites" data-page="sites"><span>站点配置</span><span class="count" id="siteCount"></span><span class="leader"></span><span class="num">贰</span></a></li>
-        <li><a href="#vocab" data-page="vocab"><span>生词本</span><span class="count" id="vocabCount"></span><span class="leader"></span><span class="num">叁</span></a></li>
-        <li><a href="#connection" data-page="connection"><span>连接与快捷键</span><span class="leader"></span><span class="num">肆</span></a></li>
+        <li><a href="#defaults" data-page="defaults"><svg class="toc-icon" width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 6h4M11 6h6M3 14h8M15 14h2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path><circle cx="9" cy="6" r="2" stroke="currentColor" stroke-width="1.5"></circle><circle cx="13" cy="14" r="2" stroke="currentColor" stroke-width="1.5"></circle></svg><span>默认配置</span><span class="leader"></span><span class="num">壹</span></a></li>
+        <li><a href="#sites" data-page="sites"><svg class="toc-icon" width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5"></circle><path d="M3 10h14M10 3c2 2.2 2.8 4.5 2.8 7s-.8 4.8-2.8 7c-2-2.2-2.8-4.5-2.8-7S8 5.2 10 3Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"></path></svg><span>站点配置</span><span class="count" id="siteCount"></span><span class="leader"></span><span class="num">贰</span></a></li>
+        <li><a href="#vocab" data-page="vocab"><svg class="toc-icon" width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 3.5h9a2 2 0 0 1 2 2V17l-4-2.2L7 17V5.5a2 2 0 0 0-2-2H4Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"></path></svg><span>生词本</span><span class="count" id="vocabCount"></span><span class="leader"></span><span class="num">叁</span></a></li>
+        <li><a href="#connection" data-page="connection"><svg class="toc-icon" width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="2.5" y="5" width="15" height="10" rx="2" stroke="currentColor" stroke-width="1.5"></rect><path d="M6 8.5h.01M9 8.5h.01M12 8.5h.01M15 8.5h.01M7 11.5h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg><span>连接与快捷键</span><span class="leader"></span><span class="num">肆</span></a></li>
       </ol>
-      <div class="colophon">第壹版 · <span id="version"></span></div>
+      <div class="colophon"><span class="colophon-ed">第壹版 · </span><span id="version"></span></div>
     </nav>
 
     <main>
@@ -785,6 +949,7 @@
         <svg class="ornament" width="60" height="12" viewBox="0 0 60 12" aria-hidden="true"><line x1="0" y1="6" x2="22" y2="6" stroke="currentColor" stroke-width="1"></line><path d="M30 1 L35 6 L30 11 L25 6 Z" fill="none" stroke="currentColor" stroke-width="1.2"></path><line x1="38" y1="6" x2="60" y2="6" stroke="currentColor" stroke-width="1"></line></svg>
         <p class="lead">这些设定对所有网站都一样，不受站点配置影响。</p>
 
+        <div class="group">
         <h2 class="sec"><span class="num">一</span>后端</h2>
         <div class="row">
           <label for="apiBaseInput" class="row-label">后端地址</label>
@@ -801,7 +966,9 @@
           </span>
         </div>
         <p class="row-hint">保存在 Chrome 账号里，随账号同步到所有设备。必须和后端 .env 里的 LCT_ACCESS_TOKEN 一致。</p>
+        </div>
 
+        <div class="group">
         <h2 class="sec"><span class="num">二</span>快捷键</h2>
         <div class="row">
           <span class="row-label">开关划词翻译</span>
@@ -809,6 +976,7 @@
           <span class="key-cap" id="shortcutKey">加载中</span>
         </div>
         <p class="row-hint hint-split"><span>就是弹出窗口里的总开关。快捷键由 Chrome 管理。</span><button type="button" class="text-btn" id="shortcutCustomizeButton" style="font-size: 13px; white-space: nowrap;">在 Chrome 中修改 →</button></p>
+        </div>
       </section>
     </main>
   </div>
